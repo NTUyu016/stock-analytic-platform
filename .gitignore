@@ -1,0 +1,41 @@
+# Claude Code 本地檔案
+.agents/
+.claude/
+skills-lock.json
+
+# 環境變數
+.env
+.env.local
+.env.*.local
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.yarn-integrity
+
+# 構建輸出
+dist/
+build/
+.next/
+out/
+
+# 編輯器和 IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 系統檔案
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 臨時檔案
+*.tmp
+*.temp
+.cache/
+~$*
