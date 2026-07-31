@@ -1,0 +1,87 @@
+# 台股持股儀表板
+
+一個以台股為主、美股為輔的個人持股儀表板網站。使用者手動記錄自己的交易，系統據以推導部位、計算損益、呈現即時行情與歷史績效。
+
+本檔案是**詞彙表**，只定義名詞是什麼，不記錄實作方式。資料表設計見 [`docs/spec/data-model.md`](./docs/spec/data-model.md)。
+
+## Language
+
+### 標的與市場
+
+**Instrument（標的）**：
+一個可被持有與報價的交易對象，由「市場 + 代號」唯一確定。台積電的台股普通股與其美股 ADR 是**兩個不同的 Instrument**。
+_Avoid_: Ticker, Symbol, 股票, 商品
+
+**Symbol（代號）**：
+Instrument 在其所屬市場中的對外識別字串，如 `2330`、`NVDA`、`BTC-USD`。單獨的 Symbol 不足以識別一個 Instrument，必須搭配 Market。
+_Avoid_: Ticker, Code
+
+**Market（市場）**：
+Instrument 掛牌交易的場所，決定其幣別、交易時段與交易日曆。目前有 `TWSE`（上市）、`TPEX`（上櫃）、`US`、`CRYPTO`。
+_Avoid_: Exchange, 交易所, 板別
+
+**Provider Symbol（資料源代號）**：
+同一個 Instrument 在某個外部資料源中的代號。台積電在 yfinance 是 `2330.TW`、在 Shioaji 是 `2330`。這是資料源的細節，不是 Instrument 的身分。
+_Avoid_: External ID, Vendor code
+
+### 持有與交易
+
+**Portfolio（投資組合）**：
+一組交易紀錄的歸屬單位，代表使用者心中一個獨立管理的帳本（如「長期存股」「短線」）。同一支 Instrument 出現在不同 Portfolio 時，是兩個各自獨立計算成本的 Position。
+_Avoid_: Account, 帳戶, 帳號, Watchlist
+
+**Transaction（交易紀錄）**：
+一筆已經發生、會改變持有狀態的事件。是本系統**唯一的事實來源** —— 部位、成本、損益全都由它推導而來，不另行儲存。
+_Avoid_: Trade, Order, Deal, 委託
+
+**Transaction Type（交易類型）**：
+Transaction 的種類，決定它如何影響股數與成本：`BUY`、`SELL`、`CASH_DIVIDEND`（現金股利）、`STOCK_DIVIDEND`（股票股利）、`ADJUSTMENT`（通用調整）。
+_Avoid_: Action, Side, 買賣別
+
+**Adjustment（通用調整）**：
+一種 Transaction Type，直接指定股數與成本的增減並附註原因，用於系統未內建專屬邏輯的公司行動（減資、換股、合併）。它是刻意保留的逃生門，不是資料錯誤的修補工具。
+_Avoid_: Correction, Fix, 修正
+
+**Position（部位）**：
+在某個時間點，某個 Portfolio 中某支 Instrument 的持有狀態（股數、成本基礎、未實現損益）。Position 是**推導值**，不儲存。
+_Avoid_: Holding, 庫存, 持股
+
+**Cost Basis（成本基礎）**：
+Position 中每股的取得成本，以**加權平均**計算，並計入手續費與交易稅。與券商對帳單上的「均價」對應。
+_Avoid_: Average price, 成本價, 買進價
+
+**Realized P&L（已實現損益）**：
+賣出時，賣出淨額與所賣股數之成本基礎的差額。已離開持有狀態，不再隨市價變動。
+_Avoid_: Profit, 獲利, 實現利益
+
+**Unrealized P&L（未實現損益）**：
+Position 目前市值與其成本基礎總額的差額。隨市價逐筆變動。
+_Avoid_: Paper gain, 帳面損益, 浮動損益
+
+### 價格
+
+**Quote（報價）**：
+Instrument 在盤中的最新成交價與相關即時欄位。**具時效性且不落地** —— 只存在於記憶體與快取中，重啟即消失。
+_Avoid_: Price, Tick, 即時價
+
+**Daily Close（每日收盤價）**：
+Instrument 在某個交易日的收盤價，落地儲存。歷史資產曲線與績效計算的唯一價格來源。
+_Avoid_: Close price, EOD, 歷史價
+
+**Exchange Rate（匯率）**：
+某一日某個幣別對台幣的換算率，落地儲存。歷史績效一律使用**當日**匯率，不使用當前匯率回溯換算。
+_Avoid_: FX, 匯價
+
+**Base Currency（基準幣別）**：
+所有跨幣別加總與呈現時換算的目標幣別，固定為台幣（TWD）。Transaction 與 Cost Basis 一律以**原幣別**儲存，只在顯示層換算。
+_Avoid_: Display currency, 主幣別
+
+### 警示
+
+**Alert（警示）**：
+使用者定義的一條條件，當 Quote 滿足它時觸發通知。
+_Avoid_: Notification, Trigger, 提醒
+
+**Notification（通知）**：
+Alert 觸發後實際送出的一則訊息。一個 Alert 可對應多則 Notification（重複觸發）與多個送達管道。
+_Avoid_: Alert, Message, 推播
