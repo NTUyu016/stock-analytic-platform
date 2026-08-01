@@ -163,6 +163,24 @@ FastAPI 自動產生 OpenAPI schema，前端由該 schema codegen 出 TypeScript
 
 實作上這意味著：**任何讀取即時報價的程式碼路徑都必須有明確的「沒有即時報價」分支**，不可以假設 Quote 一定存在。
 
+### 行情源 adapter 必須從第一天就是可換的（硬性要求）
+
+v1 預期的路徑是**先用 Fugle 免費層（5 檔訂閱、零開戶、NT$0），持股超過 5 檔後再轉永豐 Shioaji**。因此換源不是假想需求，是已排程的事件。
+
+轉移成本分三層，其中兩層可以現在就壓到接近零：
+
+| 層 | 成本 | 說明 |
+|---|---|---|
+| 資料庫 | **零** | [#9](https://github.com/NTUyu016/stock-analytic-platform/issues/9) 已為此設計 `instrument_provider_symbol`（PK `(instrument_id, provider)`）。換源就是加一列 `provider='shioaji'`，既有交易紀錄一行都不用動 |
+| 程式碼 | **低——但前提是第一天就做對** | 兩家資料模型不同：Fugle 是 `trades`/`books`/`candles`/`aggregates`/`indices`；Shioaji 是 `Tick`/`BidAsk`/`Quote`/`KBar`。這些差異必須**完全被 adapter 吸收** |
+| 行政 | **高，且是唯一真正的成本** | 開戶 + 簽署 + 強制下單測試，數個工作天，測試只在平日 08:00–20:00（見 [#8](https://github.com/NTUyu016/stock-analytic-platform/issues/8)） |
+
+**因此規定**：`src/core/` 內的領域型別**不得出現任何特定 provider 的欄位命名或列舉值**。所有 provider 專屬結構止於 adapter 邊界，向內只交出統一的 Quote 型別。§7 的契約測試對每個 provider 各跑一份，用同一組斷言。
+
+**一個現在就要知道的坑**：[#2 §2.1](../research/tw-realtime-quote-sources.md) 查證，**Fugle 基本用戶（免費）方案「快照」欄位是「不支援」**。這直接打到上面「`quote-worker` 缺席時開頁抓一次快照」的降級路徑——在 Fugle 免費層做不到。
+
+**因此降級路徑改用 yfinance 取延遲報價**，不依賴行情 provider 的快照 API。這也正好說明為什麼報價來源必須抽象化：來源不只一個，而且各有各的洞。
+
 ### 兩個單元之間怎麼傳 tick
 
 **留給 [#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) 決定。** 已知選項：Postgres `LISTEN/NOTIFY`（零額外元件，Postgres 本來就在）或 Redis pub/sub。本文只確定「有兩個單元」這個形狀。
@@ -283,12 +301,13 @@ TLS 憑證的申請與續期是那種「會在半夜三點過期時咬你」的�
 
 ### 憑證怎麼來
 
-[#10](https://github.com/NTUyu016/stock-analytic-platform/issues/10) 已定調**不公開在網際網路上**，因此 Let's Encrypt 不適用（它需要公開可達的網域才能完成驗證）。改用 Caddy 內建 CA：
+[#10](https://github.com/NTUyu016/stock-analytic-platform/issues/10) 定調**公開在網際網路上**（2026-08-02 修訂，先前為「不公開」）。決定性理由是**技術難度**：內網自簽方案（`tls internal`）需要在每台裝置上手動安裝並信任自簽 CA，iOS 上尤其繁瑣（安裝描述檔後還要另外到「憑證信任設定」手動啟用）。公開 + Let's Encrypt 由 Caddy 全自動處理，反而是難度較低的路徑。
+
+因此使用標準 ACME 流程 —— Caddy 只要看到網域名稱就自動申請並續期，不需要任何額外設定：
 
 ```
 # Caddyfile
-your-host.local {
-    tls internal              # Caddy 自簽 CA，自動產生並續期內網憑證
+stock.example.com {           # 有公開網域即自動走 Let's Encrypt
 
     handle /api/* {
         reverse_proxy localhost:8000
@@ -301,9 +320,19 @@ your-host.local {
 }
 ```
 
-> **給熟悉 nginx 的對照**：`reverse_proxy` 等同 `proxy_pass` 但預設就帶好了 `Host`、`X-Forwarded-*` 等標頭；`try_files {path} /index.html` 與 nginx 同名指令語意相同，是 SPA 前端路由的標準寫法；`tls internal` 沒有 nginx 對應物——nginx 要自己跑 certbot 或手動簽憑證再設 `ssl_certificate`。整份 Caddyfile 不需要 `server`/`location`/`upstream` 三層巢狀，也沒有 `listen 443 ssl` 這種樣板。
+> **給熟悉 nginx 的對照**：`reverse_proxy` 等同 `proxy_pass` 但預設就帶好了 `Host`、`X-Forwarded-*` 等標頭；`try_files {path} /index.html` 與 nginx 同名指令語意相同，是 SPA 前端路由的標準寫法。最大的差異是**憑證**——上面整份設定裡沒有任何一行在講 TLS，因為 Caddy 看到網域就自動申請與續期；nginx 則要自己跑 certbot、設 `ssl_certificate`／`ssl_certificate_key`、再排一個續期的 cron。另外 Caddy 不需要 `server`/`location`/`upstream` 三層巢狀，也沒有 `listen 443 ssl` 這類樣板。
 
-實際網域、憑證信任的散布方式、防火牆與成本上限，留給 [#17](https://github.com/NTUyu016/stock-analytic-platform/issues/17)。
+實際網域、防火牆與成本上限留給 [#17](https://github.com/NTUyu016/stock-analytic-platform/issues/17)。
+
+### ⚠️ 公開上網帶來的硬性約束
+
+[#2 §2.6](../research/tw-realtime-quote-sources.md) 查證：依 TWSE《交易資訊使用管理辦法》§14 / §14-1 / §27，**券商行情不得轉供第三人**，且富果條款明文禁止「將交易資訊……傳送予第三人」。
+
+網站公開在網際網路上、但行情只在登入後呈現，仍屬「自用、非揭示用途」，在授權範圍內。但因此有一條不可違反的規則：
+
+> **任何未登入即可存取的頁面或 API 端點，都不得包含即時報價、五檔、逐筆成交或其衍生數值。**
+
+這排除了「做個漂亮的公開首頁順便展示大盤」這類看似無害的設計。登入頁只能是登入頁。實作時，所有回傳 Quote 的端點都必須在認證中介層之後，**不可有例外路由**。
 
 ---
 
