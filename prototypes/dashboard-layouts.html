@@ -569,13 +569,16 @@ body:not([data-conn="live"]) .stale{opacity:.5}
   const dirClass = n => n > 0 ? "up" : n < 0 ? "down" : "flat";
   const arrow = n => n > 0 ? "▲" : n < 0 ? "▼" : "—";
 
-  /* 交易明細：費用依 #6 的規則算（手續費 0.1425% 六折、賣出證交稅股票 0.3% / ETF 0.1%） */
+  /* 交易明細
+     · fee / tax 底層分開存（#6 的費率規則不同、生效日不同），顯示時才合併成「費用」
+     · fx = 成交當日匯率。不是「當下匯率」—— 用今天的匯率換算六月的交易，
+       會讓已經發生的歷史紀錄每天變一個數字。#9 已定調歷史一律用當日匯率。 */
   const TXNS = [
-    { d:"07/29", code:"2330", name:"台積電",     act:"買", qty:1000, px:1145.00, fee:979,  tax:0,   cur:"TWD" },
-    { d:"07/22", code:"0050", name:"元大台灣50", act:"買", qty:2000, px: 218.40, fee:373,  tax:0,   cur:"TWD" },
-    { d:"07/15", code:"3037", name:"欣興",       act:"賣", qty:1000, px: 168.50, fee:144,  tax:506, cur:"TWD" },
-    { d:"07/08", code:"2454", name:"聯發科",     act:"息", qty:null, px:null,    fee:10,   tax:0,   cur:"TWD", cash:18000 },
-    { d:"06/30", code:"NVDA", name:"NVIDIA",     act:"買", qty:20,   px: 183.20, fee:15,   tax:0,   cur:"USD" },
+    { d:"07/29", code:"2330", name:"台積電",     act:"買", qty:1000, px:1145.00, fee:979,  tax:0,   cur:"TWD", fx:1 },
+    { d:"07/22", code:"0050", name:"元大台灣50", act:"買", qty:2000, px: 218.40, fee:373,  tax:0,   cur:"TWD", fx:1 },
+    { d:"07/15", code:"3037", name:"欣興",       act:"賣", qty:1000, px: 168.50, fee:144,  tax:506, cur:"TWD", fx:1 },
+    { d:"07/08", code:"2454", name:"聯發科",     act:"息", qty:null, px:null,    fee:10,   tax:0,   cur:"TWD", fx:1, cash:18000 },
+    { d:"06/30", code:"NVDA", name:"NVIDIA",     act:"買", qty:20,   px: 183.20, fee:15,   tax:0,   cur:"USD", fx:32.104 },
   ];
   const ALERTS = [
     ["13:24","up","▲","<b>台積電</b> 突破 1,180 目標價","1,146.00"],
@@ -626,7 +629,8 @@ body:not([data-conn="live"]) .stale{opacity:.5}
     { key:"tahoma",name:"Tahoma",           probe:"Tahoma",
       css:'Tahoma, Verdana, sans-serif' },
   ];
-  let uiFont = "sys", numFont = "same";
+  /* 預設值＝使用者選定的組合（回饋 2026-08-02） */
+  let uiFont = "noto", numFont = "tahoma";
 
   /* 字型偵測：與三種通用後備字型比對寬度，全部相同即代表沒載到 */
   const _fontCache = new Map();
@@ -689,7 +693,10 @@ body:not([data-conn="live"]) .stale{opacity:.5}
   };
   const fmtD = d => `${d.getMonth()+1}月${d.getDate()}日`;
 
-  function renderCurve(host) {
+  /* 只負責畫。監聽器由 wireCurve 掛，且一輩子只掛一次 ——
+     先前把兩件事寫在一起，導致每次重繪都疊加一組監聽器，
+     拖曳時監聽器數量指數成長，第二次拖曳必當。 */
+  function drawCurve(host) {
     const k = host.dataset.curve, data = curveData();
     const W = 1000, H = k === "D" ? 168 : (k === "C" ? 150 : 190);
     const mn = Math.min(...data), mx = Math.max(...data), rg = (mx - mn) || 1;
@@ -745,48 +752,75 @@ body:not([data-conn="live"]) .stale{opacity:.5}
       aria-label="總資產走勢 ${data.length} 個交易日 可拖曳選取區間">
       ${body}</svg><div class="curve-tip"></div>`;
 
-    const tip = host.querySelector(".curve-tip"), svg = host.querySelector("svg");
-    const xh = svg.querySelector(".xh"), xd = svg.querySelector(".xd");
+    // 幾何資料存在節點上，讓一次性掛好的監聽器讀得到最新值
+    host._geo = { W, H, last, data, X, Y };
+  }
+
+  /* 監聽器只掛一次 */
+  let dragHost = null, dragFrom = null, dragMoved = false, rafPending = false;
+
+  function wireCurve(host) {
+    if (host._wired) return;
+    host._wired = true;
+
     const idxAt = e => {
-      const r = host.getBoundingClientRect();
+      const g = host._geo, r = host.getBoundingClientRect();
       const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
-      return { i: Math.max(0, Math.min(last, Math.round((cx / r.width) * last))), r };
+      return { i: Math.max(0, Math.min(g.last, Math.round((cx / r.width) * g.last))), r, g };
     };
-    let dragFrom = null, moved = false;
 
     const hover = e => {
-      if (dragFrom !== null) {                       // 拖曳中：即時更新選取
+      if (dragHost === host) {                       // 拖曳中
         const { i } = idxAt(e);
-        if (i !== dragFrom) moved = true;
-        sel = { a: Math.min(dragFrom, i), b: Math.max(dragFrom, i) };
-        if (sel.a !== sel.b) { redrawAll(); }
+        if (i !== dragFrom) dragMoved = true;
+        const a = Math.min(dragFrom, i), b = Math.max(dragFrom, i);
+        if (a === b) return;
+        sel = { a, b };
+        if (!rafPending) {                           // 每個影格最多重繪一次
+          rafPending = true;
+          requestAnimationFrame(() => { rafPending = false; redrawAll(); });
+        }
         return;
       }
-      if (sel || !xh) return;                        // 已選取時不顯示十字準星
-      const { i, r } = idxAt(e);
-      xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.setAttribute("opacity", ".85");
-      xd.setAttribute("cx", X(i)); xd.setAttribute("cy", Y(data[i])); xd.setAttribute("opacity", "1");
-      tip.textContent = `${fmtD(dateAt(i,last))} · NT$${nf(data[i])}`;
-      tip.style.left = (X(i) / W * r.width) + "px";
-      tip.style.top  = (Y(data[i]) / H * r.height) + "px";
+      if (sel) return;                               // 已選取時不顯示十字準星
+      const svg = host.querySelector("svg");
+      const xh = svg && svg.querySelector(".xh"), xd = svg && svg.querySelector(".xd");
+      const tip = host.querySelector(".curve-tip");
+      if (!xh || !xd || !tip) return;
+      const { i, r, g } = idxAt(e);
+      xh.setAttribute("x1", g.X(i)); xh.setAttribute("x2", g.X(i)); xh.setAttribute("opacity", ".85");
+      xd.setAttribute("cx", g.X(i)); xd.setAttribute("cy", g.Y(g.data[i])); xd.setAttribute("opacity", "1");
+      tip.textContent = `${fmtD(dateAt(i, g.last))} · NT$${nf(g.data[i])}`;
+      tip.style.left = (g.X(i) / g.W * r.width) + "px";
+      tip.style.top  = (g.Y(g.data[i]) / g.H * r.height) + "px";
       tip.style.opacity = "1";
     };
-    const leave = () => { if (!xh) return;
-      xh.setAttribute("opacity","0"); xd.setAttribute("opacity","0"); tip.style.opacity = "0"; };
+
+    const leave = () => {
+      const svg = host.querySelector("svg");
+      const xh = svg && svg.querySelector(".xh"), xd = svg && svg.querySelector(".xd");
+      const tip = host.querySelector(".curve-tip");
+      if (xh) xh.setAttribute("opacity", "0");
+      if (xd) xd.setAttribute("opacity", "0");
+      if (tip) tip.style.opacity = "0";
+    };
+
+    const start = e => { dragHost = host; dragFrom = idxAt(e).i; dragMoved = false; };
 
     host.addEventListener("mousemove", hover);
     host.addEventListener("mouseleave", leave);
     host.addEventListener("touchmove", hover, { passive:true });
-    host.addEventListener("mousedown", e => { dragFrom = idxAt(e).i; moved = false; e.preventDefault(); });
-    host.addEventListener("touchstart", e => { dragFrom = idxAt(e).i; moved = false; }, { passive:true });
-    const end = () => {
-      if (dragFrom !== null && !moved) { sel = null; redrawAll(); }   // 單擊 = 取消選取
-      dragFrom = null;
-    };
-    host.addEventListener("mouseup", end);
-    host.addEventListener("touchend", end);
-    addEventListener("mouseup", () => { dragFrom = null; });
+    host.addEventListener("mousedown", e => { start(e); e.preventDefault(); });
+    host.addEventListener("touchstart", start, { passive:true });
   }
+
+  /* 全域只有一組結束處理，不隨重繪累積 */
+  function endDrag() {
+    if (dragHost && !dragMoved) { sel = null; redrawAll(); }   // 單擊 = 取消選取
+    dragHost = null; dragFrom = null; dragMoved = false;
+  }
+  addEventListener("mouseup", endDrag);
+  addEventListener("touchend", endDrag);
 
   function renderSelBar() {
     const data = curveData(), last = data.length - 1;
@@ -806,7 +840,11 @@ body:not([data-conn="live"]) .stale{opacity:.5}
     });
   }
   function redrawAll() {
-    document.querySelectorAll(".curve-holder").forEach(renderCurve);
+    document.querySelectorAll(".curve-holder").forEach(host => {
+      if (host.offsetParent === null) return;        // 隱藏的變體不必畫
+      drawCurve(host);
+      wireCurve(host);
+    });
     renderSelBar();
   }
 
@@ -841,30 +879,40 @@ body:not([data-conn="live"]) .stale{opacity:.5}
     </tr></thead><tbody>${rows}</tbody></table>`;
   }
 
-  /* 交易明細：股數 / 成交價 / 手續費 / 交易稅 / 淨額 分欄 */
+  /* 交易明細
+     費用合併顯示（手續費 + 交易稅），底層仍分開存。
+     淨額一律換算台幣，用成交當日匯率。原幣別金額放 title，滑過才看得到 ——
+     主表只留紅綠兩色，不讓幣別標記跟方向色搶注意力。 */
   function txnTable() {
     const rows = TXNS.map(t => {
       const gross = t.act === "息" ? t.cash : t.qty * t.px;
-      const net = t.act === "買" ? -(gross + t.fee + t.tax) : gross - t.fee - t.tax;
+      const netOrig = t.act === "買" ? -(gross + t.fee + t.tax) : gross - t.fee - t.tax;
+      const netTwd = netOrig * t.fx;
+      const costTwd = (t.fee + t.tax) * t.fx;
       const cls = t.act === "買" ? "up" : t.act === "賣" ? "down" : "flat";
-      const d = t.cur === "USD" ? 2 : 0;
-      return `<tr>
+      const tip = t.cur === "TWD" ? ""
+        : ` title="原幣別 ${signed(netOrig,2)} ${t.cur}　成交日匯率 ${t.fx}　手續費 ${nf(t.fee,2)} ${t.cur}"`;
+      return `<tr${tip}>
         <td class="cost">${t.d}</td>
-        <td><span class="sym">${t.name}</span><span class="sym-code"> ${t.code}</span></td>
+        <td><span class="sym">${t.name}</span><span class="sym-code"> ${t.code}</span>${
+          t.cur === "TWD" ? "" : '<span class="mkt-tag">US</span>'}</td>
         <td><span class="act ${cls}">${t.act}</span></td>
         <td>${t.qty === null ? "—" : nf(t.qty)}</td>
-        <td>${t.px === null ? "—" : nf(t.px, 2)}</td>
-        <td class="cost">${t.fee ? nf(t.fee, t.cur === "USD" ? 2 : 0) : "—"}</td>
-        <td class="cost">${t.tax ? nf(t.tax) : "—"}</td>
-        <td class="net ${net >= 0 ? "up" : "down"}">${signed(net, d)}${
-          t.cur === "USD" ? '<span class="cur">USD</span>' : ""}</td></tr>`;
+        <td>${t.px === null ? "—" : nf(t.px, 2)}${
+          t.cur === "TWD" ? "" : '<span class="cur">' + t.cur + "</span>"}</td>
+        <td class="cost">${costTwd ? nf(Math.round(costTwd)) : "—"}</td>
+        <td class="net ${netTwd >= 0 ? "up" : "down"}">${signed(Math.round(netTwd))}</td></tr>`;
     }).join("");
     return `<div class="ttable-wrap"><table class="ttable"><thead><tr>
       <th>日期</th><th>標的</th><th>別</th><th>股數</th><th>成交價</th>
-      <th>手續費</th><th>交易稅</th><th>淨額</th>
+      <th>費用</th><th>淨額 · TWD</th>
     </tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="tfoot-note">手續費 0.1425% 六折、最低 20 元；賣出證交稅股票 0.3%、ETF 0.1%。
-    費率不硬編碼於程式，存於設定並隨生效日切換 —— 見 issue #6。</div>`;
+    <div class="tfoot-note">
+      <b>費用</b> = 手續費 + 交易稅，合併顯示、底層分開儲存。手續費 0.1425% 六折最低 20 元；
+      賣出證交稅股票 0.3%、ETF 0.1%。費率不硬編碼於程式，存於設定並隨生效日切換 —— 見 issue #6。<br>
+      <b>淨額</b>一律換算台幣，採<b>成交當日匯率</b>（非今日匯率，否則歷史紀錄會每天變動）。
+      成交價維持原幣別，外幣列滑鼠停留可看原幣別金額與當日匯率。
+    </div>`;
   }
 
   function renderRows() {
