@@ -1,0 +1,789 @@
+<title>持股儀表板原型 — 三種版面</title>
+
+<style>
+/* ============================================================
+   #11 儀表板畫面原型 — 三個變體，?variant= 切換
+   假資料。丟棄式程式碼，不是實作。
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+  --plane:   #f4f4f6;
+  --surface: #fcfcfd;
+  --sunk:    #eeeef1;
+  --ink:     #14161a;
+  --ink-2:   #565b66;
+  --ink-3:   #686d78;
+  --rule:    #e2e3e8;
+  --rule-2:  #d3d5dc;
+  --c-red:   #c62a35;
+  --c-green: #0a7d0a;
+  --c-red-wash:   rgba(198, 42, 53, 0.13);
+  --c-green-wash: rgba(10, 125, 10, 0.13);
+  --warn:    #9a5b00;
+  --warn-wash: rgba(154, 91, 0, 0.12);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --shadow: 0 1px 2px rgba(20,22,26,.05), 0 4px 12px rgba(20,22,26,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --plane: #101114; --surface: #191b1f; --sunk: #202329;
+    --ink: #f2f3f5; --ink-2: #a8adb8; --ink-3: #868b96;
+    --rule: #2a2d33; --rule-2: #363a42;
+    --c-red: #e66767; --c-green: #2fbf2f;
+    --c-red-wash: rgba(230,103,103,.17); --c-green-wash: rgba(47,191,47,.15);
+    --warn: #fab219; --warn-wash: rgba(250,178,25,.14);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane: #101114; --surface: #191b1f; --sunk: #202329;
+  --ink: #f2f3f5; --ink-2: #a8adb8; --ink-3: #868b96;
+  --rule: #2a2d33; --rule-2: #363a42;
+  --c-red: #e66767; --c-green: #2fbf2f;
+  --c-red-wash: rgba(230,103,103,.17); --c-green-wash: rgba(47,191,47,.15);
+  --warn: #fab219; --warn-wash: rgba(250,178,25,.14);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
+}
+
+/* 市場慣例：這是本原型最重要的一個開關 ------------------- */
+body[data-mkt="tw"] { --dir-up: var(--c-red);   --dir-down: var(--c-green);
+                      --dir-up-wash: var(--c-red-wash); --dir-down-wash: var(--c-green-wash); }
+body[data-mkt="us"] { --dir-up: var(--c-green); --dir-down: var(--c-red);
+                      --dir-up-wash: var(--c-green-wash); --dir-down-wash: var(--c-red-wash); }
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 0 0 92px;
+  background: var(--plane); color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+  font-size: 15px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.num { font-variant-numeric: tabular-nums; }
+.up   { color: var(--dir-up); }
+.down { color: var(--dir-down); }
+.flat { color: var(--ink-2); }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 3px; }
+
+/* ---------- 連線狀態（絕不用紅綠燈，因為綠在台股是跌） ---------- */
+.conn { display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; letter-spacing: .02em; color: var(--ink-2); white-space: nowrap; }
+.conn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-2); flex: none; }
+body[data-conn="degraded"] .conn { color: var(--warn); font-weight: 600; }
+body[data-conn="degraded"] .conn .dot {
+  background: var(--warn); border-radius: 1px; transform: rotate(45deg); }
+body[data-conn="live"]     .conn-degraded-only { display: none; }
+body[data-conn="degraded"] .conn-live-only     { display: none; }
+.degrade-banner { display: none; }
+body[data-conn="degraded"] .degrade-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--warn-wash); border: 1px solid var(--warn);
+  color: var(--warn); font-size: 13px; font-weight: 600;
+  padding: 9px 14px; border-radius: 6px; }
+body[data-conn="degraded"] .stale { opacity: .55; }
+
+/* ---------- tick 閃動：三個變體各用一種手法 ---------- */
+@keyframes washUp   { from { background-color: var(--dir-up-wash); }   to { background-color: transparent; } }
+@keyframes washDown { from { background-color: var(--dir-down-wash); } to { background-color: transparent; } }
+@keyframes barPulse { 0% { opacity: 1; } 100% { opacity: 0; } }
+.tick-up   { animation: washUp   900ms ease-out; }
+.tick-down { animation: washDown 900ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .tick-up, .tick-down, .tick-bar { animation: none !important; }
+}
+
+/* ============ 共用小元件 ============ */
+.eyebrow { font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 600; }
+.sym { font-weight: 650; letter-spacing: -.01em; }
+.sym-code { color: var(--ink-3); font-size: 12px; font-weight: 500; }
+.mkt-tag { font-size: 10px; letter-spacing: .06em; color: var(--ink-3);
+  border: 1px solid var(--rule-2); border-radius: 3px; padding: 0 4px; }
+
+/* ================================================================
+   變體 A — 總覽優先
+   大 KPI 橫幅 + 資產曲線 + 持股表，四塊走頂部分頁
+   tick 手法：整列顏色殘留
+   ================================================================ */
+#A .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+#A header { border-bottom: 1px solid var(--rule); background: var(--surface); }
+#A .topbar { display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 16px 0 14px; flex-wrap: wrap; }
+#A .brand { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+#A nav { display: flex; gap: 2px; flex-wrap: wrap; }
+#A nav button { appearance: none; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 14px; color: var(--ink-2); padding: 9px 14px;
+  border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent; }
+#A nav button[aria-current="page"] { color: var(--ink); font-weight: 620;
+  border-bottom-color: var(--ink); }
+#A nav button:hover { background: var(--sunk); }
+#A .kpis { display: grid; gap: 16px; grid-template-columns: repeat(3, 1fr);
+  margin: 28px 0 22px; }
+#A .kpi { background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 10px; padding: 20px 22px; box-shadow: var(--shadow); }
+#A .kpi .v { font-size: 34px; font-weight: 300; letter-spacing: -.025em;
+  margin-top: 6px; line-height: 1.1; }
+#A .kpi .sub { font-size: 13.5px; margin-top: 7px; color: var(--ink-2); }
+#A .panel { background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 10px; box-shadow: var(--shadow); margin-bottom: 22px; overflow: hidden; }
+#A .panel-hd { display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; padding: 17px 22px 13px; flex-wrap: wrap; }
+#A .panel-hd h2 { font-size: 15px; font-weight: 620; margin: 0; letter-spacing: -.01em; }
+#A .tblwrap { overflow-x: auto; }
+#A table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 720px; }
+#A thead th { text-align: right; font-size: 11px; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: 600;
+  padding: 8px 22px 8px 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+#A thead th:first-child { text-align: left; padding-left: 22px; }
+#A tbody td { text-align: right; padding: 14px 22px 14px 0;
+  border-bottom: 1px solid var(--rule); white-space: nowrap; }
+#A tbody td:first-child { text-align: left; padding-left: 22px; }
+#A tbody tr:last-child td { border-bottom: 0; }
+
+/* ================================================================
+   變體 B — 部位優先
+   側欄導覽 + 一行摘要條，畫面 90% 給持股列
+   等寬數字、細線分隔、無卡片
+   tick 手法：左側細直條閃一下，背景完全不動
+   ================================================================ */
+#B { display: grid; grid-template-columns: 208px 1fr; min-height: 100vh; }
+#B .side { border-right: 1px solid var(--rule); background: var(--surface);
+  padding: 18px 0; position: sticky; top: 0; align-self: start; height: 100vh; }
+#B .side .brand { font-size: 13px; font-weight: 650; padding: 0 20px 20px;
+  letter-spacing: -.01em; }
+#B .side a { display: block; padding: 9px 20px; font-size: 13.5px;
+  color: var(--ink-2); text-decoration: none; border-left: 2px solid transparent; }
+#B .side a[aria-current="page"] { color: var(--ink); font-weight: 620;
+  border-left-color: var(--ink); background: var(--sunk); }
+#B .side a:hover { background: var(--sunk); }
+#B .main { padding: 0; min-width: 0; }
+#B .strip { display: flex; align-items: center; gap: 26px; flex-wrap: wrap;
+  padding: 15px 26px; border-bottom: 1px solid var(--rule); background: var(--surface); }
+#B .strip .item { display: flex; align-items: baseline; gap: 8px; }
+#B .strip .lbl { font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 600; }
+#B .strip .val { font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  font-size: 15px; font-weight: 600; letter-spacing: -.02em; }
+#B .strip .spacer { flex: 1; }
+#B .rows { padding: 0; }
+#B .row { display: grid; align-items: center; gap: 16px;
+  grid-template-columns: 3px 1fr 92px 106px 108px 116px;
+  padding: 0 26px 0 0; border-bottom: 1px solid var(--rule); position: relative; }
+#B .row > * { padding: 13px 0; }
+#B .row .tick-bar { padding: 0; align-self: stretch; background: var(--dir-up);
+  opacity: 0; }
+#B .row.is-up   .tick-bar { background: var(--dir-up); }
+#B .row.is-down .tick-bar { background: var(--dir-down); }
+#B .row.pulse .tick-bar { animation: barPulse 800ms ease-out; }
+#B .row:hover { background: var(--sunk); }
+#B .row .name { padding-left: 23px; min-width: 0; }
+#B .row .name .sym { font-size: 14.5px; display: block; }
+#B .row .name .meta { font-size: 11.5px; color: var(--ink-3);
+  font-family: ui-monospace, monospace; margin-top: 2px; }
+#B .row .fig { text-align: right;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  font-size: 13.5px; letter-spacing: -.02em; }
+#B .row .fig .sub { display: block; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+#B .row .spark { padding: 10px 0; }
+#B .colhdr { display: grid; gap: 16px;
+  grid-template-columns: 3px 1fr 92px 106px 108px 116px;
+  padding: 0 26px 0 0; border-bottom: 1px solid var(--rule-2); background: var(--plane); }
+#B .colhdr > * { padding: 7px 0; font-size: 10.5px; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: 600; text-align: right; }
+#B .colhdr .name { text-align: left; padding-left: 23px; }
+
+/* ================================================================
+   變體 C — 全景網格
+   不分頁，四塊同時在畫面上。密度最高。
+   tick 手法：整格背景閃（最吵）
+   ================================================================ */
+#C .grid { display: grid; gap: 1px; background: var(--rule);
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  grid-auto-rows: min-content; border-bottom: 1px solid var(--rule); }
+#C .cell { background: var(--surface); padding: 0; min-width: 0; }
+#C .cell-hd { display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--rule);
+  background: var(--plane); }
+#C .cell-hd h2 { margin: 0; font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-2); font-weight: 700; }
+#C .cell-hd .aux { font-size: 11px; color: var(--ink-3);
+  font-variant-numeric: tabular-nums; }
+#C .cell-bd { padding: 12px 14px; }
+#C .cell.span2 { grid-column: 1 / -1; }
+#C .topstrip { display: flex; gap: 0; border-bottom: 1px solid var(--rule);
+  background: var(--surface); flex-wrap: wrap; }
+#C .topstrip .m { padding: 11px 16px; border-right: 1px solid var(--rule); flex: 1 1 150px; }
+#C .topstrip .m .l { font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700; }
+#C .topstrip .m .v { font-size: 19px; font-weight: 600; letter-spacing: -.02em;
+  margin-top: 3px; }
+#C .ctable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+#C .ctable th { text-align: right; font-size: 10px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: 700;
+  padding: 5px 10px 5px 0; border-bottom: 1px solid var(--rule-2); white-space: nowrap; }
+#C .ctable th:first-child { text-align: left; }
+#C .ctable td { text-align: right; padding: 7px 10px 7px 0;
+  border-bottom: 1px solid var(--rule); white-space: nowrap; }
+#C .ctable td:first-child { text-align: left; }
+#C .ctable tr:last-child td { border-bottom: 0; }
+#C .alert { display: flex; gap: 9px; align-items: flex-start; padding: 8px 0;
+  border-bottom: 1px solid var(--rule); font-size: 12.5px; }
+#C .alert:last-child { border-bottom: 0; }
+#C .alert .when { color: var(--ink-3); font-size: 11px;
+  font-variant-numeric: tabular-nums; flex: none; width: 42px; }
+#C .alert .icon { flex: none; font-weight: 700; width: 13px; text-align: center; }
+
+/* 資產配置：水平堆疊條，每段直接標示（淺色模式對比 WARN 的 relief 規則） */
+.alloc-bar { display: flex; gap: 2px; height: 26px; margin-bottom: 12px; }
+.alloc-bar span { border-radius: 2px; }
+.alloc-list { display: grid; gap: 6px; font-size: 12.5px; }
+.alloc-list .r { display: flex; align-items: center; gap: 8px; }
+.alloc-list .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.alloc-list .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.alloc-list .pc { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+
+/* ---------- 資產曲線的十字準星 ---------- */
+.curve-holder { position: relative; }
+.curve-tip { position: absolute; pointer-events: none; opacity: 0;
+  background: var(--ink); color: var(--surface); font-size: 11.5px;
+  padding: 5px 9px; border-radius: 5px; white-space: nowrap; transform: translate(-50%, -130%);
+  font-variant-numeric: tabular-nums; z-index: 5; transition: opacity .1s; }
+
+/* ================= 原型切換列（不是被評估的設計的一部分） ================= */
+#switcher { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+  z-index: 100; display: flex; align-items: stretch; gap: 0;
+  background: #14161a; color: #f2f3f5; border-radius: 999px;
+  box-shadow: 0 6px 26px rgba(0,0,0,.4); font-size: 13px;
+  border: 1px solid rgba(255,255,255,.16); max-width: calc(100vw - 24px); }
+:root[data-theme="dark"] #switcher,
+:root:where(:not([data-theme="light"])) #switcher { background: #f2f3f5; color: #14161a;
+  border-color: rgba(0,0,0,.2); }
+@media (prefers-color-scheme: light) { :root:where(:not([data-theme="dark"])) #switcher {
+  background: #14161a; color: #f2f3f5; } }
+#switcher button { appearance: none; background: none; border: 0; color: inherit;
+  font: inherit; cursor: pointer; padding: 0 13px; display: flex; align-items: center;
+  gap: 6px; }
+#switcher button:hover { opacity: .65; }
+#switcher .vlabel { padding: 9px 6px; display: flex; align-items: center; gap: 8px;
+  min-width: 168px; justify-content: center; font-weight: 600; letter-spacing: -.01em; }
+#switcher .div { width: 1px; background: currentColor; opacity: .22; margin: 7px 0; }
+#switcher .tog { padding: 0 13px; font-size: 12px; letter-spacing: .01em; }
+#switcher .tog b { font-weight: 700; }
+#switcher .hint { font-size: 11px; opacity: .6; padding: 0 13px 0 0; display: flex;
+  align-items: center; }
+
+/* ---------------- 手機 ---------------- */
+@media (max-width: 860px) {
+  #A .kpis { grid-template-columns: 1fr; gap: 10px; }
+  #A .kpi .v { font-size: 28px; }
+  #B { grid-template-columns: 1fr; }
+  #B .side { position: static; height: auto; display: flex; overflow-x: auto;
+    padding: 0; border-right: 0; border-bottom: 1px solid var(--rule); }
+  #B .side .brand { display: none; }
+  #B .side a { border-left: 0; border-bottom: 2px solid transparent; white-space: nowrap; }
+  #B .side a[aria-current="page"] { border-left: 0; border-bottom-color: var(--ink); }
+  #B .colhdr { display: none; }
+  #B .row { grid-template-columns: 3px 1fr 108px; row-gap: 0; }
+  #B .row .spark, #B .row .fig.hide-sm { display: none; }
+  #C .grid { grid-template-columns: 1fr; }
+  #switcher .hint, #switcher .tog-label-long { display: none; }
+  #switcher .vlabel { min-width: 120px; font-size: 12px; }
+}
+</style>
+
+<!-- ================================================================
+     變體 A — 總覽優先
+     ================================================================ -->
+<div id="A" class="variant" hidden>
+  <header>
+    <div class="wrap">
+      <div class="topbar">
+        <span class="brand">持股儀表板</span>
+        <span class="conn">
+          <span class="dot"></span>
+          <span class="conn-live-only">即時連線 · 台股</span>
+          <span class="conn-degraded-only">延遲報價 · 行情未連線</span>
+        </span>
+      </div>
+      <nav>
+        <button type="button" aria-current="page">總覽</button>
+        <button type="button">個股分析</button>
+        <button type="button">警示</button>
+        <button type="button">交易紀錄</button>
+        <button type="button">歷史績效</button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="degrade-banner" style="margin-top:20px">
+      <span>◈</span>
+      <span>行情連線中斷，以下為今日收盤價，非即時報價。</span>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="eyebrow">總資產</div>
+        <div class="v num" data-bind="totalValue">—</div>
+        <div class="sub">成本 NT$1,600,000</div>
+      </div>
+      <div class="kpi">
+        <div class="eyebrow">今日損益</div>
+        <div class="v num" data-bind="dayPnl" data-dir="1">—</div>
+        <div class="sub num" data-bind="dayPnlPct">—</div>
+      </div>
+      <div class="kpi">
+        <div class="eyebrow">總報酬</div>
+        <div class="v num" data-bind="totalPnl" data-dir="1">—</div>
+        <div class="sub num" data-bind="totalPnlPct">—</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hd">
+        <h2>總資產走勢</h2>
+        <span class="eyebrow">近 6 個月</span>
+      </div>
+      <div class="cell-bd" style="padding:4px 22px 20px">
+        <div class="curve-holder" data-curve="A"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hd"><h2>持股</h2><span class="eyebrow">7 檔</span></div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr>
+            <th>標的</th><th>現價</th><th>漲跌</th><th>市值</th>
+            <th>未實現損益</th><th>報酬率</th><th>佔比</th>
+          </tr></thead>
+          <tbody data-rows="A"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     變體 B — 部位優先
+     ================================================================ -->
+<div id="B" class="variant" hidden>
+  <aside class="side">
+    <div class="brand">持股儀表板</div>
+    <a href="#" aria-current="page">持股</a>
+    <a href="#">個股分析</a>
+    <a href="#">警示</a>
+    <a href="#">交易紀錄</a>
+    <a href="#">歷史績效</a>
+  </aside>
+  <div class="main">
+    <div class="strip">
+      <div class="item"><span class="lbl">總資產</span>
+        <span class="val num" data-bind="totalValue">—</span></div>
+      <div class="item"><span class="lbl">今日</span>
+        <span class="val num" data-bind="dayPnlCombo" data-dir="1">—</span></div>
+      <div class="item"><span class="lbl">總報酬</span>
+        <span class="val num" data-bind="totalPnlCombo" data-dir="1">—</span></div>
+      <span class="spacer"></span>
+      <span class="conn"><span class="dot"></span>
+        <span class="conn-live-only">即時連線</span>
+        <span class="conn-degraded-only">延遲報價</span>
+      </span>
+    </div>
+    <div style="padding:14px 26px 0"><div class="degrade-banner">
+      <span>◈</span><span>行情連線中斷，以下為收盤價。</span></div></div>
+    <div class="colhdr">
+      <span></span><span class="name">標的</span><span>走勢</span>
+      <span>現價</span><span>市值</span><span>未實現損益</span>
+    </div>
+    <div class="rows" data-rows="B"></div>
+  </div>
+</div>
+
+<!-- ================================================================
+     變體 C — 全景網格
+     ================================================================ -->
+<div id="C" class="variant" hidden>
+  <div class="topstrip">
+    <div class="m"><div class="l">總資產</div>
+      <div class="v num" data-bind="totalValue">—</div></div>
+    <div class="m"><div class="l">今日損益</div>
+      <div class="v num" data-bind="dayPnlCombo" data-dir="1">—</div></div>
+    <div class="m"><div class="l">總報酬</div>
+      <div class="v num" data-bind="totalPnlCombo" data-dir="1">—</div></div>
+    <div class="m"><div class="l">持股檔數</div><div class="v num">7</div></div>
+    <div class="m" style="border-right:0"><div class="l">行情</div>
+      <div class="v" style="font-size:13px;margin-top:6px"><span class="conn">
+        <span class="dot"></span>
+        <span class="conn-live-only">即時連線中</span>
+        <span class="conn-degraded-only">未連線 · 延遲</span></span></div></div>
+  </div>
+
+  <div class="grid">
+    <div class="cell">
+      <div class="cell-hd"><h2>持股</h2><span class="aux">7 檔 · 依市值排序</span></div>
+      <div class="cell-bd" style="padding:6px 14px 10px">
+        <div style="overflow-x:auto">
+          <table class="ctable">
+            <thead><tr><th>標的</th><th>現價</th><th>漲跌</th><th>市值</th>
+              <th>未實現</th><th>報酬率</th></tr></thead>
+            <tbody data-rows="C"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cell-hd"><h2>資產配置</h2><span class="aux">依市值</span></div>
+      <div class="cell-bd">
+        <div class="alloc-bar" data-alloc-bar></div>
+        <div class="alloc-list" data-alloc-list></div>
+      </div>
+    </div>
+
+    <div class="cell span2">
+      <div class="cell-hd"><h2>總資產走勢</h2><span class="aux">近 6 個月 · 每日收盤</span></div>
+      <div class="cell-bd"><div class="curve-holder" data-curve="C"></div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cell-hd"><h2>警示</h2><span class="aux">今日觸發 3 則</span></div>
+      <div class="cell-bd" style="padding:4px 14px 12px">
+        <div class="alert"><span class="when">13:24</span><span class="icon up">▲</span>
+          <span><b>台積電</b> 突破 1,180 目標價</span></div>
+        <div class="alert"><span class="when">11:07</span><span class="icon down">▼</span>
+          <span><b>欣興</b> 跌破成本 −8%（停損線）</span></div>
+        <div class="alert"><span class="when">09:31</span><span class="icon" style="color:var(--warn)">◈</span>
+          <span><b>聯發科</b> 除息日在 3 個交易日後</span></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cell-hd"><h2>最近交易</h2><span class="aux">近 5 筆</span></div>
+      <div class="cell-bd" style="padding:6px 14px 10px">
+        <table class="ctable">
+          <thead><tr><th>日期</th><th>標的</th><th>別</th><th>股數</th><th>價格</th></tr></thead>
+          <tbody>
+            <tr><td>07/29</td><td>2330</td><td class="up">買</td><td class="num">1,000</td><td class="num">1,145.00</td></tr>
+            <tr><td>07/22</td><td>0050</td><td class="up">買</td><td class="num">2,000</td><td class="num">218.40</td></tr>
+            <tr><td>07/15</td><td>3037</td><td class="down">賣</td><td class="num">1,000</td><td class="num">168.50</td></tr>
+            <tr><td>07/08</td><td>2454</td><td class="flat">息</td><td class="num">—</td><td class="num">18,000</td></tr>
+            <tr><td>06/30</td><td>NVDA</td><td class="up">買</td><td class="num">20</td><td class="num">183.20</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 原型切換列 ===================== -->
+<div id="switcher" role="group" aria-label="原型切換">
+  <button type="button" id="prev" aria-label="上一個版面">←</button>
+  <span class="vlabel" id="vlabel">A — 總覽優先</span>
+  <button type="button" id="next" aria-label="下一個版面">→</button>
+  <span class="div"></span>
+  <button type="button" class="tog" id="mktTog">
+    <span class="tog-label-long">慣例</span> <b id="mktLbl">台股 紅漲</b></button>
+  <span class="div"></span>
+  <button type="button" class="tog" id="connTog">
+    <span class="tog-label-long">行情</span> <b id="connLbl">即時</b></button>
+  <span class="hint">← → 切換</span>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------- 假資料 ---------------- */
+  const HOLDINGS = [
+    { code:"2330", name:"台積電",       mkt:"TWSE", qty:2000, cost: 892.00, px:1146.00, prev:1132.00, cur:"TWD" },
+    { code:"2454", name:"聯發科",       mkt:"TWSE", qty:500,  cost:1180.00, px:1305.00, prev:1318.00, cur:"TWD" },
+    { code:"0050", name:"元大台灣50",   mkt:"TWSE", qty:5000, cost: 186.30, px: 221.85, prev: 220.10, cur:"TWD" },
+    { code:"2317", name:"鴻海",         mkt:"TWSE", qty:3000, cost: 168.50, px: 214.50, prev: 213.00, cur:"TWD" },
+    { code:"3037", name:"欣興",         mkt:"TWSE", qty:2000, cost: 182.00, px: 167.50, prev: 171.00, cur:"TWD" },
+    { code:"NVDA", name:"NVIDIA",       mkt:"US",   qty:60,   cost: 148.20, px: 191.40, prev: 188.70, cur:"USD" },
+    { code:"VOO",  name:"Vanguard S&P", mkt:"US",   qty:40,   cost: 512.00, px: 597.30, prev: 596.10, cur:"USD" },
+  ];
+  const FX = 32.292;                       // #5 用的央行收盤匯率
+  const twd = h => h.cur === "USD" ? FX : 1;
+
+  const nf = (n, d = 0) => n.toLocaleString("zh-TW",
+    { minimumFractionDigits: d, maximumFractionDigits: d });
+  const signed = (n, d = 0) => (n >= 0 ? "+" : "−") + nf(Math.abs(n), d);
+  const dirClass = n => n > 0 ? "up" : n < 0 ? "down" : "flat";
+  const arrow = n => n > 0 ? "▲" : n < 0 ? "▼" : "—";
+
+  /* 六個月的假資產曲線（固定種子，重載不會變） */
+  const CURVE = (() => {
+    let v = 1600000, s = 20260201, out = [];
+    const rnd = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+    for (let i = 0; i < 126; i++) { v *= 1 + (rnd() - 0.44) * 0.017; out.push(v); }
+    return out;
+  })();
+
+  /* ---------------- 迷你走勢圖 ---------------- */
+  function sparkline(seed, up, w = 74, h = 26) {
+    let s = seed, pts = [];
+    const rnd = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+    let v = 50;
+    for (let i = 0; i < 26; i++) { v += (rnd() - (up ? 0.42 : 0.58)) * 11; pts.push(v); }
+    const mn = Math.min(...pts), mx = Math.max(...pts), rg = (mx - mn) || 1;
+    const X = i => (i / (pts.length - 1)) * (w - 3) + 1.5;
+    const Y = p => h - 3 - ((p - mn) / rg) * (h - 6);
+    const d = pts.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p).toFixed(1)).join(" ");
+    const cls = up ? "up" : "down";
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"
+      style="display:block;overflow:visible">
+      <path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6"
+        stroke-linecap="round" stroke-linejoin="round" class="${cls}"/>
+      <circle cx="${X(pts.length - 1).toFixed(1)}" cy="${Y(pts[pts.length - 1]).toFixed(1)}"
+        r="2.4" fill="currentColor" class="${cls}"/>
+    </svg>`;
+  }
+
+  /* ---------------- 資產曲線（含十字準星） ---------------- */
+  function renderCurve(host) {
+    const W = 1000, H = host.dataset.curve === "C" ? 150 : 190;
+    const mn = Math.min(...CURVE), mx = Math.max(...CURVE), rg = mx - mn;
+    const X = i => (i / (CURVE.length - 1)) * W;
+    const Y = v => H - 16 - ((v - mn) / rg) * (H - 34);
+    const line = CURVE.map((v, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1)).join(" ");
+    const area = line + ` L ${W} ${H} L 0 ${H} Z`;
+    const grid = [0, .25, .5, .75, 1].map(t =>
+      `<line x1="0" y1="${(16 + t * (H - 34)).toFixed(1)}" x2="${W}"
+        y2="${(16 + t * (H - 34)).toFixed(1)}" stroke="var(--rule)" stroke-width="1"/>`).join("");
+    host.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none"
+           style="display:block;overflow:visible" role="img"
+           aria-label="總資產走勢，近 6 個月，由 160 萬成長至 184.7 萬">
+        <defs><linearGradient id="ag-${host.dataset.curve}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--ink-2)" stop-opacity=".17"/>
+          <stop offset="100%" stop-color="var(--ink-2)" stop-opacity="0"/>
+        </linearGradient></defs>
+        ${grid}
+        <path d="${area}" fill="url(#ag-${host.dataset.curve})"/>
+        <path d="${line}" fill="none" stroke="var(--ink)" stroke-width="2"
+          stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        <line class="xh" x1="0" y1="8" x2="0" y2="${H - 8}" stroke="var(--ink-3)"
+          stroke-width="1" stroke-dasharray="3 3" opacity="0"/>
+        <circle class="xd" r="3.5" fill="var(--ink)" opacity="0"/>
+      </svg>
+      <div class="curve-tip"></div>`;
+
+    const svg = host.querySelector("svg"), tip = host.querySelector(".curve-tip");
+    const xh = svg.querySelector(".xh"), xd = svg.querySelector(".xd");
+    const move = e => {
+      const r = host.getBoundingClientRect();
+      const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+      const i = Math.max(0, Math.min(CURVE.length - 1,
+        Math.round((cx / r.width) * (CURVE.length - 1))));
+      xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.setAttribute("opacity", ".85");
+      xd.setAttribute("cx", X(i)); xd.setAttribute("cy", Y(CURVE[i])); xd.setAttribute("opacity", "1");
+      const d = new Date(2026, 1, 2); d.setDate(d.getDate() + Math.round(i * 1.45));
+      tip.textContent = `${d.getMonth() + 1}/${d.getDate()} · NT$${nf(CURVE[i])}`;
+      tip.style.left = (X(i) / W * r.width) + "px";
+      tip.style.top = (Y(CURVE[i]) / H * r.height) + "px";
+      tip.style.opacity = "1";
+    };
+    const leave = () => { xh.setAttribute("opacity", "0"); xd.setAttribute("opacity", "0");
+      tip.style.opacity = "0"; };
+    host.addEventListener("mousemove", move);
+    host.addEventListener("touchmove", move, { passive: true });
+    host.addEventListener("mouseleave", leave);
+    host.addEventListener("touchend", leave);
+  }
+
+  /* ---------------- 算出目前的數字 ---------------- */
+  function compute() {
+    let value = 0, cost = 0, dayPnl = 0;
+    HOLDINGS.forEach(h => {
+      const r = twd(h);
+      value  += h.px * h.qty * r;
+      cost   += h.cost * h.qty * r;
+      dayPnl += (h.px - h.prev) * h.qty * r;
+    });
+    return { value, cost, dayPnl, totalPnl: value - cost };
+  }
+
+  /* ---------------- 畫列 ---------------- */
+  function renderRows() {
+    const t = compute();
+    const sorted = [...HOLDINGS].sort((a, b) => b.px * b.qty * twd(b) - a.px * a.qty * twd(a));
+
+    // A：表格列
+    const tbA = document.querySelector('[data-rows="A"]');
+    tbA.innerHTML = sorted.map(h => {
+      const r = twd(h), mv = h.px * h.qty * r, chg = h.px - h.prev,
+            pct = chg / h.prev * 100, pnl = (h.px - h.cost) * h.qty * r,
+            ror = (h.px - h.cost) / h.cost * 100, w = mv / t.value * 100;
+      return `<tr data-code="${h.code}">
+        <td><span class="sym">${h.name}</span>
+          <span class="sym-code num"> ${h.code}</span>
+          ${h.mkt === "US" ? '<span class="mkt-tag">US</span>' : ""}</td>
+        <td class="num stale" data-px>${nf(h.px, 2)}</td>
+        <td class="num ${dirClass(chg)} stale" data-chg>${arrow(chg)} ${signed(pct, 2)}%</td>
+        <td class="num stale">${nf(mv)}</td>
+        <td class="num ${dirClass(pnl)}">${signed(pnl)}</td>
+        <td class="num ${dirClass(pnl)}">${signed(ror, 1)}%</td>
+        <td class="num flat">${nf(w, 1)}%</td></tr>`;
+    }).join("");
+
+    // B：部位列
+    const tbB = document.querySelector('[data-rows="B"]');
+    tbB.innerHTML = sorted.map(h => {
+      const r = twd(h), mv = h.px * h.qty * r, chg = h.px - h.prev,
+            pct = chg / h.prev * 100, pnl = (h.px - h.cost) * h.qty * r,
+            ror = (h.px - h.cost) / h.cost * 100;
+      const seed = h.code.split("").reduce((a, c) => a + c.charCodeAt(0), 7) * 977;
+      return `<div class="row ${chg >= 0 ? "is-up" : "is-down"}" data-code="${h.code}">
+        <div class="tick-bar"></div>
+        <div class="name"><span class="sym">${h.name}</span>
+          <span class="meta">${h.code} · ${nf(h.qty)} 股 · 均價 ${nf(h.cost, 2)}</span></div>
+        <div class="spark ${dirClass(chg)}">${sparkline(seed, chg >= 0)}</div>
+        <div class="fig stale" data-px>${nf(h.px, 2)}
+          <span class="sub ${dirClass(chg)}" data-chg>${signed(pct, 2)}%</span></div>
+        <div class="fig stale">${nf(mv)}<span class="sub">市值</span></div>
+        <div class="fig hide-sm ${dirClass(pnl)}">${signed(pnl)}
+          <span class="sub ${dirClass(pnl)}">${signed(ror, 1)}%</span></div>
+      </div>`;
+    }).join("");
+
+    // C：緊湊表格
+    const tbC = document.querySelector('[data-rows="C"]');
+    tbC.innerHTML = sorted.map(h => {
+      const r = twd(h), mv = h.px * h.qty * r, chg = h.px - h.prev,
+            pct = chg / h.prev * 100, pnl = (h.px - h.cost) * h.qty * r,
+            ror = (h.px - h.cost) / h.cost * 100;
+      return `<tr data-code="${h.code}">
+        <td><span class="sym">${h.code}</span>
+          <span class="sym-code"> ${h.name}</span></td>
+        <td class="num stale" data-px>${nf(h.px, 2)}</td>
+        <td class="num ${dirClass(chg)} stale" data-chg>${signed(pct, 2)}%</td>
+        <td class="num stale">${nf(mv)}</td>
+        <td class="num ${dirClass(pnl)}">${signed(pnl)}</td>
+        <td class="num ${dirClass(pnl)}">${signed(ror, 1)}%</td></tr>`;
+    }).join("");
+
+    // 配置條（每段直接標示 —— 淺色模式對比 WARN 的 relief 規則）
+    const bar = document.querySelector("[data-alloc-bar]"),
+          list = document.querySelector("[data-alloc-list]");
+    const slots = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)"];
+    const top = sorted.slice(0, 4).map((h, i) => ({
+      nm: h.name, v: h.px * h.qty * twd(h), c: slots[i] }));
+    const rest = sorted.slice(4).reduce((a, h) => a + h.px * h.qty * twd(h), 0);
+    top.push({ nm: "其他 3 檔", v: rest, c: slots[4] });
+    bar.innerHTML = top.map(s =>
+      `<span style="background:${s.c};flex:${(s.v / t.value * 100).toFixed(2)}"
+        title="${s.nm} ${nf(s.v / t.value * 100, 1)}%"></span>`).join("");
+    list.innerHTML = top.map(s =>
+      `<div class="r"><span class="sw" style="background:${s.c}"></span>
+        <span class="nm">${s.nm}</span>
+        <span class="pc num">${nf(s.v / t.value * 100, 1)}%</span></div>`).join("");
+
+    bind(t);
+  }
+
+  function bind(t) {
+    const set = (k, html, dir) => document.querySelectorAll(`[data-bind="${k}"]`).forEach(el => {
+      el.innerHTML = html;
+      if (dir !== undefined) { el.classList.remove("up", "down", "flat");
+        el.classList.add(dirClass(dir)); }
+    });
+    set("totalValue", "NT$" + nf(t.value));
+    set("dayPnl", signed(t.dayPnl), t.dayPnl);
+    set("dayPnlPct", signed(t.dayPnl / (t.value - t.dayPnl) * 100, 2) + "%", t.dayPnl);
+    set("totalPnl", signed(t.totalPnl), t.totalPnl);
+    set("totalPnlPct", signed(t.totalPnl / t.cost * 100, 1) + "%", t.totalPnl);
+    set("dayPnlCombo", `${signed(t.dayPnl)} <span style="opacity:.75">(${
+      signed(t.dayPnl / (t.value - t.dayPnl) * 100, 2)}%)</span>`, t.dayPnl);
+    set("totalPnlCombo", `${signed(t.totalPnl)} <span style="opacity:.75">(${
+      signed(t.totalPnl / t.cost * 100, 1)}%)</span>`, t.totalPnl);
+  }
+
+  /* ---------------- 即時跳動：三個變體各用一種手法 ---------------- */
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function tick() {
+    if (document.body.dataset.conn !== "live" || reduce) return;
+    const h = HOLDINGS[Math.floor(Math.random() * HOLDINGS.length)];
+    const step = h.px * (Math.random() - 0.5) * 0.004;
+    h.px = Math.round((h.px + step) * 100) / 100;
+    const up = step >= 0;
+    renderRows();
+    document.querySelectorAll(`[data-code="${h.code}"]`).forEach(el => {
+      if (el.closest("#A") || el.closest("#C")) {
+        // A 與 C：顏色殘留（C 的格子較小所以看起來更明顯）
+        el.classList.add(up ? "tick-up" : "tick-down");
+        setTimeout(() => el.classList.remove("tick-up", "tick-down"), 900);
+      } else {
+        // B：只有左側細直條閃一下，背景完全不動
+        el.classList.add("pulse");
+        setTimeout(() => el.classList.remove("pulse"), 800);
+      }
+    });
+  }
+
+  /* ---------------- 切換器 ---------------- */
+  const VARIANTS = [
+    ["A", "總覽優先"],
+    ["B", "部位優先"],
+    ["C", "全景網格"],
+  ];
+  const qs = new URLSearchParams(location.search);
+  let cur = (qs.get("variant") || "A").toUpperCase();
+  if (!VARIANTS.some(v => v[0] === cur)) cur = "A";
+
+  function show(key, push) {
+    cur = key;
+    VARIANTS.forEach(([k]) => {
+      const el = document.getElementById(k);
+      el.hidden = k !== key;
+      el.style.display = k === key ? (k === "B" ? "grid" : "block") : "none";
+    });
+    const label = VARIANTS.find(v => v[0] === key);
+    document.getElementById("vlabel").textContent = `${label[0]} — ${label[1]}`;
+    if (push) {
+      const u = new URL(location.href);
+      u.searchParams.set("variant", key);
+      history.replaceState(null, "", u);
+    }
+    document.querySelectorAll(".curve-holder").forEach(renderCurve);
+  }
+  const cycle = d => {
+    const i = VARIANTS.findIndex(v => v[0] === cur);
+    show(VARIANTS[(i + d + VARIANTS.length) % VARIANTS.length][0], true);
+  };
+  document.getElementById("prev").onclick = () => cycle(-1);
+  document.getElementById("next").onclick = () => cycle(1);
+  addEventListener("keydown", e => {
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    if (e.key === "ArrowLeft") cycle(-1);
+    if (e.key === "ArrowRight") cycle(1);
+  });
+
+  // 市場慣例
+  document.getElementById("mktTog").onclick = () => {
+    const b = document.body, tw = b.dataset.mkt === "tw";
+    b.dataset.mkt = tw ? "us" : "tw";
+    document.getElementById("mktLbl").textContent = tw ? "美股 綠漲" : "台股 紅漲";
+  };
+  // 行情連線
+  document.getElementById("connTog").onclick = () => {
+    const b = document.body, live = b.dataset.conn === "live";
+    b.dataset.conn = live ? "degraded" : "live";
+    document.getElementById("connLbl").textContent = live ? "降級" : "即時";
+  };
+
+  document.body.dataset.mkt = "tw";
+  document.body.dataset.conn = "live";
+  renderRows();
+  show(cur, false);
+  setInterval(tick, 1100);
+})();
+</script>
