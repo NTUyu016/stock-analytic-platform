@@ -161,7 +161,14 @@ body:not([data-conn="live"]) .stale{opacity:.5}
 .ttable .cost{color:var(--ink-3)}
 .ttable .net{font-weight:620}
 .ttable .cur{font-size:10px;color:var(--ink-3);margin-left:3px}
-.tfoot-note{font-size:11px;color:var(--ink-3);padding-top:10px;line-height:1.6}
+.tfoot-note{font-size:11px;color:var(--ink-3);padding-top:12px;line-height:1.7}
+/* 市場分段：幣別在小標宣告一次，列上完全不標記 */
+.tsec + .tsec{margin-top:16px}
+.tsec-hd{display:flex;align-items:baseline;gap:9px;padding-bottom:5px}
+.tsec-nm{font-size:12.5px;font-weight:700;letter-spacing:-.005em}
+.tsec-cur{font-size:10.5px;letter-spacing:.07em;color:var(--ink-3);font-weight:600;
+  border:1px solid var(--rule-2);border-radius:3px;padding:0 5px}
+.tsec-n{font-size:11px;color:var(--ink-3);margin-left:auto;font-variant-numeric:tabular-nums}
 
 /* 側欄 */
 .side{border-right:1px solid var(--rule);background:var(--surface);padding:18px 0;
@@ -410,7 +417,7 @@ body:not([data-conn="live"]) .stale{opacity:.5}
       <!-- 第 3 層：與第 1 層同一組欄寬比例，欄縫上下對齊 -->
       <div class="row2">
         <section class="card">
-          <div class="card-hd"><h2>最近交易</h2><span class="eyebrow">近 5 筆</span></div>
+          <div class="card-hd"><h2>最近交易</h2><span class="eyebrow">台股 4 · 美股 3</span></div>
           <div class="card-bd" data-txns></div>
         </section>
         <section class="card">
@@ -455,7 +462,7 @@ body:not([data-conn="live"]) .stale{opacity:.5}
       <div class="card-bd flush"><div class="htable-wrap" data-holdings></div></div>
     </section>
     <section class="card">
-      <div class="card-hd"><h2>最近交易</h2><span class="eyebrow">近 5 筆</span></div>
+      <div class="card-hd"><h2>最近交易</h2><span class="eyebrow">台股 4 · 美股 3</span></div>
       <div class="card-bd" data-txns></div>
     </section>
     <section class="card">
@@ -509,7 +516,7 @@ body:not([data-conn="live"]) .stale{opacity:.5}
       <div class="cell-bd" style="padding:0 14px 12px"><div class="curve-holder" data-curve="C"></div></div></div>
     <div class="cell"><div class="cell-hd"><h2>資產配置</h2><span class="aux">依市值</span></div>
       <div class="cell-bd"><div class="alloc" data-alloc></div></div></div>
-    <div class="cell span2"><div class="cell-hd"><h2>最近交易</h2><span class="aux">近 5 筆</span></div>
+    <div class="cell span2"><div class="cell-hd"><h2>最近交易</h2><span class="aux">台股 4 · 美股 3</span></div>
       <div class="cell-bd" data-txns></div></div>
     <div class="cell span2"><div class="cell-hd"><h2>警示</h2><span class="aux">今日 3 則</span></div>
       <div class="cell-bd tight" data-alerts></div></div>
@@ -573,12 +580,16 @@ body:not([data-conn="live"]) .stale{opacity:.5}
      · fee / tax 底層分開存（#6 的費率規則不同、生效日不同），顯示時才合併成「費用」
      · fx = 成交當日匯率。不是「當下匯率」—— 用今天的匯率換算六月的交易，
        會讓已經發生的歷史紀錄每天變一個數字。#9 已定調歷史一律用當日匯率。 */
-  const TXNS = [
-    { d:"07/29", code:"2330", name:"台積電",     act:"買", qty:1000, px:1145.00, fee:979,  tax:0,   cur:"TWD", fx:1 },
-    { d:"07/22", code:"0050", name:"元大台灣50", act:"買", qty:2000, px: 218.40, fee:373,  tax:0,   cur:"TWD", fx:1 },
-    { d:"07/15", code:"3037", name:"欣興",       act:"賣", qty:1000, px: 168.50, fee:144,  tax:506, cur:"TWD", fx:1 },
-    { d:"07/08", code:"2454", name:"聯發科",     act:"息", qty:null, px:null,    fee:10,   tax:0,   cur:"TWD", fx:1, cash:18000 },
-    { d:"06/30", code:"NVDA", name:"NVIDIA",     act:"買", qty:20,   px: 183.20, fee:15,   tax:0,   cur:"USD", fx:32.104 },
+  const TXN_TW = [
+    { d:"07/29", code:"2330", name:"台積電",     act:"買", qty:1000, px:1145.00, fee:979, tax:0,   fx:1 },
+    { d:"07/22", code:"0050", name:"元大台灣50", act:"買", qty:2000, px: 218.40, fee:373, tax:0,   fx:1 },
+    { d:"07/15", code:"3037", name:"欣興",       act:"賣", qty:1000, px: 168.50, fee:144, tax:506, fx:1 },
+    { d:"07/08", code:"2454", name:"聯發科",     act:"息", qty:null, px:null,    fee:10,  tax:0,   fx:1, cash:18000 },
+  ];
+  const TXN_US = [
+    { d:"07/11", code:"VOO",  name:"Vanguard S&P", act:"買", qty:15, px:594.20, fee:15, tax:0,     fx:32.180 },
+    { d:"06/30", code:"NVDA", name:"NVIDIA",       act:"買", qty:20, px:183.20, fee:15, tax:0,     fx:32.104 },
+    { d:"06/12", code:"VOO",  name:"Vanguard S&P", act:"息", qty:null, px:null, fee:0,  tax:12.75, fx:32.440, cash:42.50 },
   ];
   const ALERTS = [
     ["13:24","up","▲","<b>台積電</b> 突破 1,180 目標價","1,146.00"],
@@ -879,39 +890,48 @@ body:not([data-conn="live"]) .stale{opacity:.5}
     </tr></thead><tbody>${rows}</tbody></table>`;
   }
 
-  /* 交易明細
-     費用合併顯示（手續費 + 交易稅），底層仍分開存。
-     淨額一律換算台幣，用成交當日匯率。原幣別金額放 title，滑過才看得到 ——
-     主表只留紅綠兩色，不讓幣別標記跟方向色搶注意力。 */
-  function txnTable() {
-    const rows = TXNS.map(t => {
+  /* 交易明細：台股與美股拆成兩張表
+     拆開的理由不只版面 —— 兩邊的費用結構根本不同：
+       台股 手續費 0.1425%×折讓 ＋ 賣出證交稅 0.3%／ETF 0.1%
+       美股 手續費有最低收費（比例失效）、無證交稅、股利就源扣繳 30%
+     擠在同一欄時「費用」其實是三種不同的東西。
+     拆開後每張表內部同質，幣別在小標宣告一次，列上完全不標記。 */
+  function txnRows(list, dec) {
+    return list.map(t => {
       const gross = t.act === "息" ? t.cash : t.qty * t.px;
-      const netOrig = t.act === "買" ? -(gross + t.fee + t.tax) : gross - t.fee - t.tax;
-      const netTwd = netOrig * t.fx;
-      const costTwd = (t.fee + t.tax) * t.fx;
+      const cost = t.fee + t.tax;
+      const net = t.act === "買" ? -(gross + cost) : gross - cost;
       const cls = t.act === "買" ? "up" : t.act === "賣" ? "down" : "flat";
-      const tip = t.cur === "TWD" ? ""
-        : ` title="原幣別 ${signed(netOrig,2)} ${t.cur}　成交日匯率 ${t.fx}　手續費 ${nf(t.fee,2)} ${t.cur}"`;
+      const tip = t.fx === 1 ? ""
+        : ` title="約 ${signed(Math.round(net * t.fx))} TWD　成交日匯率 ${t.fx}"`;
       return `<tr${tip}>
         <td class="cost">${t.d}</td>
-        <td><span class="sym">${t.name}</span><span class="sym-code"> ${t.code}</span>${
-          t.cur === "TWD" ? "" : '<span class="mkt-tag">US</span>'}</td>
+        <td><span class="sym">${t.name}</span><span class="sym-code"> ${t.code}</span></td>
         <td><span class="act ${cls}">${t.act}</span></td>
         <td>${t.qty === null ? "—" : nf(t.qty)}</td>
-        <td>${t.px === null ? "—" : nf(t.px, 2)}${
-          t.cur === "TWD" ? "" : '<span class="cur">' + t.cur + "</span>"}</td>
-        <td class="cost">${costTwd ? nf(Math.round(costTwd)) : "—"}</td>
-        <td class="net ${netTwd >= 0 ? "up" : "down"}">${signed(Math.round(netTwd))}</td></tr>`;
+        <td>${t.px === null ? "—" : nf(t.px, 2)}</td>
+        <td class="cost">${cost ? nf(cost, dec) : "—"}</td>
+        <td class="net ${net >= 0 ? "up" : "down"}">${signed(net, dec)}</td></tr>`;
     }).join("");
-    return `<div class="ttable-wrap"><table class="ttable"><thead><tr>
-      <th>日期</th><th>標的</th><th>別</th><th>股數</th><th>成交價</th>
-      <th>費用</th><th>淨額 · TWD</th>
-    </tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="tfoot-note">
-      <b>費用</b> = 手續費 + 交易稅，合併顯示、底層分開儲存。手續費 0.1425% 六折最低 20 元；
-      賣出證交稅股票 0.3%、ETF 0.1%。費率不硬編碼於程式，存於設定並隨生效日切換 —— 見 issue #6。<br>
-      <b>淨額</b>一律換算台幣，採<b>成交當日匯率</b>（非今日匯率，否則歷史紀錄會每天變動）。
-      成交價維持原幣別，外幣列滑鼠停留可看原幣別金額與當日匯率。
+  }
+  function txnSection(label, unit, list, dec) {
+    return `<div class="tsec">
+      <div class="tsec-hd"><span class="tsec-nm">${label}</span>
+        <span class="tsec-cur">${unit}</span>
+        <span class="tsec-n">${list.length} 筆</span></div>
+      <div class="ttable-wrap"><table class="ttable"><thead><tr>
+        <th>日期</th><th>標的</th><th>別</th><th>股數</th><th>成交價</th>
+        <th>費用</th><th>淨額</th>
+      </tr></thead><tbody>${txnRows(list, dec)}</tbody></table></div></div>`;
+  }
+  function txnTable() {
+    return txnSection("台股", "新臺幣", TXN_TW, 0)
+         + txnSection("美股", "美元", TXN_US, 2)
+         + `<div class="tfoot-note">
+      <b>費用</b> = 手續費 + 交易稅，合併顯示、<b>底層分開儲存</b>（兩者費率規則與落日條款不同，見 issue #6）。<br>
+      台股：手續費 0.1425% 六折最低 20 元；賣出證交稅股票 0.3%、ETF 0.1%。<br>
+      美股：複委託手續費有最低收費故比例失效；無證交稅；<b>股利就源扣繳 30%</b>。<br>
+      費率一律不硬編碼於程式，存於設定並隨生效日切換。美股列滑鼠停留可看以<b>成交當日匯率</b>換算的台幣金額。
     </div>`;
   }
 
