@@ -5,11 +5,11 @@
    #11 儀表板畫面原型 — ?variant= 切換。假資料。丟棄式，不是實作。
 
    已定案（回饋 2026-08-02）：
-   · tick 一律用 B 的細直條，背景不閃
-   · 紅漲綠跌統一台股慣例，不做切換（美股標的也照台股顯示）
-   · 連線狀態拆成三態：即時 / 非交易時段 / 盤中斷線
-     —— 非交易時段是正常，不用警告色；只有盤中斷線才是異常
-   · D 為依回饋合成的版本
+   · tick 一律細直條，背景永遠不閃
+   · 紅漲綠跌統一台股慣例，不做切換
+   · 連線三態：即時 / 非交易時段（正常）/ 盤中斷線（異常）
+   · 持股用「A 的表格結構 + B 的走勢圖 + 成本均價 + 報酬率」，A 與 D 共用
+   · 警示上移到第一屏
    ============================================================ */
 
 :root {
@@ -21,6 +21,8 @@
   --warn:#9a5b00; --warn-wash:rgba(154,91,0,.10);
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
   --shadow:0 1px 2px rgba(20,22,26,.05), 0 4px 12px rgba(20,22,26,.05);
+  --pad:18px;            /* 所有卡片共用的水平內距 —— 對齊靠這個 */
+  --hd-h:44px;           /* 所有卡片標題列共用高度 —— 對稱靠這個 */
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
@@ -45,7 +47,7 @@
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
 }
 
-/* 台股慣例：紅漲綠跌。已定案不做切換，故直接綁在 :root。 */
+/* 台股慣例：紅漲綠跌。已定案不做切換。 */
 :root { --dir-up: var(--c-red); --dir-down: var(--c-green); }
 
 *{box-sizing:border-box}
@@ -53,13 +55,12 @@ body{margin:0;padding:0 0 92px;background:var(--plane);color:var(--ink);
   font-family:system-ui,-apple-system,"Segoe UI","Noto Sans TC",sans-serif;
   font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .num{font-variant-numeric:tabular-nums}
-.mono{font-family:ui-monospace,"SF Mono","Cascadia Mono",Menlo,monospace}
 .up{color:var(--dir-up)} .down{color:var(--dir-down)} .flat{color:var(--ink-2)}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:3px}
 h1,h2{margin:0}
 
 /* ============ 連線三態 ============
-   絕不用紅綠燈 —— 綠在台股是「跌」。用形狀＋文字＋琥珀。
+   絕不用紅綠燈 —— 綠在台股是「跌」。
    非交易時段是正常狀態，刻意保持中性；只有盤中斷線才是警告。 */
 .conn{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;
   color:var(--ink-2);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -67,20 +68,22 @@ h1,h2{margin:0}
 body[data-conn="closed"] .conn .dot{background:none;box-shadow:inset 0 0 0 1.5px var(--ink-3)}
 body[data-conn="lost"] .conn{color:var(--warn);font-weight:600}
 body[data-conn="lost"] .conn .dot{background:var(--warn);border-radius:1px;transform:rotate(45deg)}
-.banner{display:none;align-items:center;gap:9px;font-size:13px;
-  padding:9px 14px;border-radius:6px;border:1px solid var(--rule-2);
-  background:var(--sunk);color:var(--ink-2)}
+.banner{display:none;align-items:center;gap:9px;font-size:13px;padding:9px 14px;
+  border-radius:8px;border:1px solid var(--rule-2);background:var(--sunk);color:var(--ink-2)}
 body[data-conn="closed"] .banner.b-closed{display:flex}
-body[data-conn="lost"]   .banner.b-lost{display:flex;
-  background:var(--warn-wash);border-color:var(--warn);color:var(--warn);font-weight:600}
+body[data-conn="lost"] .banner.b-lost{display:flex;background:var(--warn-wash);
+  border-color:var(--warn);color:var(--warn);font-weight:600}
 body:not([data-conn="live"]) .stale{opacity:.5}
 
 /* ============ tick：一律細直條，背景永遠不動 ============ */
 @keyframes barPulse{0%{opacity:1}100%{opacity:0}}
+@keyframes edgeUp{0%{border-left-color:var(--dir-up)}100%{border-left-color:transparent}}
+@keyframes edgeDown{0%{border-left-color:var(--dir-down)}100%{border-left-color:transparent}}
 .tickbar{background:var(--dir-up);opacity:0;border-radius:0 2px 2px 0}
 .is-down .tickbar{background:var(--dir-down)}
 .pulse .tickbar{animation:barPulse 800ms ease-out}
-@media (prefers-reduced-motion: reduce){.pulse .tickbar{animation:none!important}}
+@media (prefers-reduced-motion: reduce){
+  .pulse .tickbar,.htable tbody tr.pulse td:first-child{animation:none!important}}
 
 /* ============ 共用 ============ */
 .eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;
@@ -88,9 +91,7 @@ body:not([data-conn="live"]) .stale{opacity:.5}
 .sym{font-weight:650;letter-spacing:-.01em}
 .sym-code{color:var(--ink-3);font-size:12px;font-weight:500}
 .mkt-tag{font-size:10px;letter-spacing:.06em;color:var(--ink-3);
-  border:1px solid var(--rule-2);border-radius:3px;padding:0 4px}
-
-/* 期間切換 chips */
+  border:1px solid var(--rule-2);border-radius:3px;padding:0 4px;margin-left:2px}
 .chips{display:flex;gap:2px}
 .chips button{appearance:none;border:0;background:none;font:inherit;font-size:12px;
   color:var(--ink-3);padding:3px 9px;border-radius:5px;cursor:pointer;
@@ -98,28 +99,132 @@ body:not([data-conn="live"]) .stale{opacity:.5}
 .chips button[aria-pressed="true"]{background:var(--ink);color:var(--surface);font-weight:600}
 .chips button:hover:not([aria-pressed="true"]){background:var(--sunk);color:var(--ink)}
 
-/* 曲線 */
-.curve-holder{position:relative}
-.curve-tip{position:absolute;pointer-events:none;opacity:0;background:var(--ink);
-  color:var(--surface);font-size:11.5px;padding:5px 9px;border-radius:5px;
-  white-space:nowrap;transform:translate(-50%,-130%);font-variant-numeric:tabular-nums;
-  z-index:5;transition:opacity .1s}
+/* ============ 持股表：A 的結構 ＋ B 的走勢圖 ＋ 成本均價 ＋ 報酬率 ============
+   tick 直條用 td 的 border-left 做 —— 不用 display:flex 破壞表格佈局。 */
+.htable-wrap{overflow-x:auto}
+.htable{width:100%;border-collapse:collapse;font-size:13.5px;min-width:840px}
+.htable th{text-align:right;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600;padding:8px 16px 8px 0;
+  border-bottom:1px solid var(--rule-2);white-space:nowrap}
+.htable th:first-child{text-align:left;padding-left:calc(var(--pad) + 3px)}
+.htable th:last-child{padding-right:var(--pad)}
+.htable td{text-align:right;padding:11px 16px 11px 0;border-bottom:1px solid var(--rule);
+  white-space:nowrap;font-variant-numeric:tabular-nums}
+.htable td:first-child{text-align:left;padding-left:var(--pad);
+  border-left:3px solid transparent;font-variant-numeric:normal}
+.htable td:last-child{padding-right:var(--pad)}
+.htable tbody tr:last-child td{border-bottom:0}
+.htable tbody tr:hover td{background:var(--sunk)}
+.htable tbody tr.pulse.is-up   td:first-child{animation:edgeUp   800ms ease-out}
+.htable tbody tr.pulse.is-down td:first-child{animation:edgeDown 800ms ease-out}
+.htable .spark-cell{padding-top:6px;padding-bottom:6px;width:78px}
+.htable .spark-cell svg{margin-left:auto}
+.htable .cost{color:var(--ink-2)}
 
-/* 資產配置：排序水平長條 ＋ 每列直接標示
-   （淺色模式類別色對比為 WARN，故 relief 規則要求可見標籤） */
-.alloc{display:grid;gap:11px}
-.alloc .r{display:grid;grid-template-columns:1fr auto;gap:3px 12px;align-items:baseline}
+/* ============ 資產配置：排序長條 ＋ 每列直接標示 ============
+   （淺色模式類別色對比為 WARN，relief 規則要求可見標籤） */
+.alloc{display:grid;gap:12px}
+.alloc .r{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:baseline}
 .alloc .nm{font-size:13px;display:flex;align-items:center;gap:7px;min-width:0}
 .alloc .nm .sw{width:9px;height:9px;border-radius:2px;flex:none}
 .alloc .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .alloc .pc{font-size:13px;font-weight:620;font-variant-numeric:tabular-nums}
-.alloc .track{grid-column:1/-1;height:7px;background:var(--sunk);border-radius:4px;overflow:hidden}
-.alloc .track i{display:block;height:100%;border-radius:4px}
+.alloc .track{grid-column:1/-1;height:6px;background:var(--sunk);border-radius:3px;overflow:hidden}
+.alloc .track i{display:block;height:100%;border-radius:3px}
 .alloc .mv{grid-column:1/-1;font-size:11.5px;color:var(--ink-3);
-  font-variant-numeric:tabular-nums;margin-top:-1px}
+  font-variant-numeric:tabular-nums}
 
-/* B 式持股列（D 也用這套） */
-.plist{--cols:3px 1fr 92px 108px 112px 122px}
+/* ============ 清單列（警示與交易共用同一種節奏 → 兩欄看起來才對稱） ============ */
+.lrow{display:grid;grid-template-columns:44px 15px 1fr auto;gap:9px;align-items:baseline;
+  padding:9px 0;border-bottom:1px solid var(--rule);font-size:13px}
+.lrow:last-child{border-bottom:0}
+.lrow .when{color:var(--ink-3);font-size:11.5px;font-variant-numeric:tabular-nums}
+.lrow .icon{font-weight:700;text-align:center;font-size:11px}
+.lrow .what{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow .amt{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-2)}
+
+/* 側欄（B 與 D 共用） */
+.side{border-right:1px solid var(--rule);background:var(--surface);padding:18px 0;
+  position:sticky;top:0;align-self:start;height:100vh}
+.side .brand{font-size:13px;font-weight:650;padding:0 20px 20px;letter-spacing:-.01em}
+.side a{display:block;padding:9px 20px;font-size:13.5px;color:var(--ink-2);
+  text-decoration:none;border-left:2px solid transparent}
+.side a[aria-current="page"]{color:var(--ink);font-weight:620;
+  border-left-color:var(--ink);background:var(--sunk)}
+.side a:hover{background:var(--sunk)}
+
+/* ================================================================
+   D — 工作台
+   側欄 ＋ 單頁不分頁。版面改成三層，每層等寬或等分，解掉「不對稱」。
+   ================================================================ */
+#D{display:grid;grid-template-columns:208px 1fr;min-height:100vh}
+#D .main{min-width:0}
+#D .stack{display:grid;gap:14px;padding:14px var(--pad);align-content:start}
+#D .row2{display:grid;gap:14px;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);
+  align-items:stretch}
+#D .row2b{display:grid;gap:14px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  align-items:stretch}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;
+  box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.card-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  height:var(--hd-h);padding:0 var(--pad);border-bottom:1px solid var(--rule);flex:none}
+.card-hd h2{font-size:13px;font-weight:650;letter-spacing:-.005em;white-space:nowrap}
+.card-bd{padding:14px var(--pad);flex:1;min-width:0}
+.card-bd.flush{padding:0}
+.card-bd.tight{padding:2px var(--pad) 10px}
+
+/* 總資產面板 */
+.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
+  flex-wrap:wrap;padding:18px var(--pad) 4px}
+.hero .big{font-size:38px;font-weight:300;letter-spacing:-.03em;line-height:1;
+  font-variant-numeric:tabular-nums}
+.hero .big-lbl{font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600;margin-bottom:9px}
+.hero .subs{display:flex;gap:24px;flex-wrap:wrap}
+.hero .subs .s .l{font-size:11px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600}
+.hero .subs .s .v{font-size:18px;font-weight:600;letter-spacing:-.02em;margin-top:3px;
+  font-variant-numeric:tabular-nums}
+.hero-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px var(--pad) 0;flex-wrap:wrap}
+
+/* ================================================================
+   A — 總覽優先（持股表已換成共用的 .htable）
+   ================================================================ */
+#A .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+#A header{border-bottom:1px solid var(--rule);background:var(--surface)}
+#A .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:16px 0 14px;flex-wrap:wrap}
+#A .brand{font-size:15px;font-weight:650;letter-spacing:-.01em}
+#A nav{display:flex;gap:2px;flex-wrap:wrap}
+#A nav button{appearance:none;border:0;background:none;cursor:pointer;font:inherit;
+  font-size:14px;color:var(--ink-2);padding:9px 14px;border-radius:6px 6px 0 0;
+  border-bottom:2px solid transparent}
+#A nav button[aria-current="page"]{color:var(--ink);font-weight:620;border-bottom-color:var(--ink)}
+#A nav button:hover{background:var(--sunk)}
+#A .kpis{display:grid;gap:16px;grid-template-columns:repeat(3,1fr);margin:22px 0}
+#A .kpi{background:var(--surface);border:1px solid var(--rule);border-radius:10px;
+  padding:20px 22px;box-shadow:var(--shadow)}
+#A .kpi .v{font-size:32px;font-weight:300;letter-spacing:-.025em;margin-top:6px;
+  line-height:1.1;font-variant-numeric:tabular-nums}
+#A .kpi .sub{font-size:13.5px;margin-top:7px;color:var(--ink-2);
+  font-variant-numeric:tabular-nums}
+#A .card{margin-bottom:18px}
+
+/* ================================================================
+   B — 部位優先（保留供對照）
+   ================================================================ */
+#B{display:grid;grid-template-columns:208px 1fr;min-height:100vh}
+#B .main{min-width:0}
+#B .strip{display:flex;align-items:center;gap:26px;flex-wrap:wrap;padding:15px 26px;
+  border-bottom:1px solid var(--rule);background:var(--surface)}
+#B .strip .item{display:flex;align-items:baseline;gap:8px}
+#B .strip .lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600}
+#B .strip .val{font-family:ui-monospace,Menlo,monospace;font-size:15px;font-weight:600;
+  letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+#B .strip .spacer{flex:1}
+.plist{--cols:3px 1fr 92px 108px 112px 122px;padding-right:26px}
 .plist .hd{display:grid;gap:16px;grid-template-columns:var(--cols);
   border-bottom:1px solid var(--rule-2);background:var(--plane)}
 .plist .hd>*{padding:7px 0;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
@@ -134,115 +239,24 @@ body:not([data-conn="live"]) .stale{opacity:.5}
 .plist .row .name .sym{font-size:14.5px;display:block}
 .plist .row .name .meta{font-size:11.5px;color:var(--ink-3);
   font-family:ui-monospace,monospace;margin-top:2px}
-.plist .row .fig{text-align:right;font-family:ui-monospace,"SF Mono",Menlo,monospace;
+.plist .row .fig{text-align:right;font-family:ui-monospace,Menlo,monospace;
   font-size:13.5px;letter-spacing:-.02em}
 .plist .row .fig .sub{display:block;font-size:11px;color:var(--ink-3);margin-top:2px}
 .plist .row .spark{padding:10px 0}
 
-/* 側欄（B 與 D 共用） */
-.side{border-right:1px solid var(--rule);background:var(--surface);padding:18px 0;
-  position:sticky;top:0;align-self:start;height:100vh}
-.side .brand{font-size:13px;font-weight:650;padding:0 20px 20px;letter-spacing:-.01em}
-.side a{display:block;padding:9px 20px;font-size:13.5px;color:var(--ink-2);
-  text-decoration:none;border-left:2px solid transparent}
-.side a[aria-current="page"]{color:var(--ink);font-weight:620;
-  border-left-color:var(--ink);background:var(--sunk)}
-.side a:hover{background:var(--sunk)}
-
 /* ================================================================
-   D — 工作台（依回饋合成）
-   B 的側欄 ＋ 單頁不分頁 ＋ B 式持股列
-   面板改少改大，解掉「C 太分散、資訊不清楚」
-   ================================================================ */
-#D{display:grid;grid-template-columns:208px 1fr;min-height:100vh}
-#D .main{min-width:0;padding:0}
-#D .stack{display:grid;gap:14px;padding:14px 18px}
-#D .card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;
-  box-shadow:var(--shadow);overflow:hidden}
-#D .card-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;
-  padding:13px 18px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
-#D .card-hd h2{font-size:13px;font-weight:650;letter-spacing:-.005em}
-#D .card-bd{padding:16px 18px}
-
-/* 總資產面板 —— 美化過：大數字 ＋ 兩個副指標 ＋ 期間 ＋ 曲線 */
-#D .hero{display:flex;align-items:flex-end;justify-content:space-between;
-  gap:26px;flex-wrap:wrap;padding:20px 18px 6px}
-#D .hero .big{font-size:40px;font-weight:300;letter-spacing:-.03em;line-height:1;
-  font-variant-numeric:tabular-nums}
-#D .hero .big-lbl{font-size:11px;letter-spacing:.09em;text-transform:uppercase;
-  color:var(--ink-3);font-weight:600;margin-bottom:9px}
-#D .hero .subs{display:flex;gap:26px;flex-wrap:wrap}
-#D .hero .subs .s .l{font-size:11px;letter-spacing:.07em;text-transform:uppercase;
-  color:var(--ink-3);font-weight:600}
-#D .hero .subs .s .v{font-size:19px;font-weight:600;letter-spacing:-.02em;margin-top:3px;
-  font-variant-numeric:tabular-nums}
-#D .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:14px}
-
-/* ================================================================
-   A — 總覽優先
-   ================================================================ */
-#A .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
-#A header{border-bottom:1px solid var(--rule);background:var(--surface)}
-#A .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;
-  padding:16px 0 14px;flex-wrap:wrap}
-#A .brand{font-size:15px;font-weight:650;letter-spacing:-.01em}
-#A nav{display:flex;gap:2px;flex-wrap:wrap}
-#A nav button{appearance:none;border:0;background:none;cursor:pointer;font:inherit;
-  font-size:14px;color:var(--ink-2);padding:9px 14px;border-radius:6px 6px 0 0;
-  border-bottom:2px solid transparent}
-#A nav button[aria-current="page"]{color:var(--ink);font-weight:620;border-bottom-color:var(--ink)}
-#A nav button:hover{background:var(--sunk)}
-#A .kpis{display:grid;gap:16px;grid-template-columns:repeat(3,1fr);margin:28px 0 22px}
-#A .kpi{background:var(--surface);border:1px solid var(--rule);border-radius:10px;
-  padding:20px 22px;box-shadow:var(--shadow)}
-#A .kpi .v{font-size:34px;font-weight:300;letter-spacing:-.025em;margin-top:6px;line-height:1.1}
-#A .kpi .sub{font-size:13.5px;margin-top:7px;color:var(--ink-2)}
-#A .panel{background:var(--surface);border:1px solid var(--rule);border-radius:10px;
-  box-shadow:var(--shadow);margin-bottom:22px;overflow:hidden}
-#A .panel-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;
-  padding:15px 22px 13px;flex-wrap:wrap}
-#A .panel-hd h2{font-size:15px;font-weight:620;letter-spacing:-.01em}
-#A .tblwrap{overflow-x:auto}
-#A table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
-#A thead th{text-align:right;font-size:11px;letter-spacing:.07em;text-transform:uppercase;
-  color:var(--ink-3);font-weight:600;padding:8px 22px 8px 0;
-  border-bottom:1px solid var(--rule);white-space:nowrap}
-#A thead th:first-child{text-align:left;padding-left:22px}
-#A tbody td{text-align:right;padding:0 22px 0 0;border-bottom:1px solid var(--rule);white-space:nowrap}
-#A tbody td:first-child{text-align:left;padding-left:0}
-#A tbody td>span.cellpad{display:block;padding:14px 0}
-#A tbody td:first-child{display:flex;align-items:stretch;gap:0}
-#A tbody td .tickbar{width:3px;flex:none;margin-right:20px}
-#A tbody tr:last-child td{border-bottom:0}
-
-/* ================================================================
-   B — 部位優先
-   ================================================================ */
-#B{display:grid;grid-template-columns:208px 1fr;min-height:100vh}
-#B .main{padding:0;min-width:0}
-#B .strip{display:flex;align-items:center;gap:26px;flex-wrap:wrap;padding:15px 26px;
-  border-bottom:1px solid var(--rule);background:var(--surface)}
-#B .strip .item{display:flex;align-items:baseline;gap:8px}
-#B .strip .lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;
-  color:var(--ink-3);font-weight:600}
-#B .strip .val{font-family:ui-monospace,Menlo,monospace;font-size:15px;font-weight:600;
-  letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-#B .strip .spacer{flex:1}
-#B .plist{padding-right:26px}
-
-/* ================================================================
-   C — 全景網格
+   C — 全景網格（保留供對照）
    ================================================================ */
 #C .grid{display:grid;gap:1px;background:var(--rule);
   grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);
   grid-auto-rows:min-content;border-bottom:1px solid var(--rule)}
-#C .cell{background:var(--surface);min-width:0}
+#C .cell{background:var(--surface);min-width:0;display:flex;flex-direction:column}
 #C .cell-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:10px 14px;border-bottom:1px solid var(--rule);background:var(--plane)}
+  height:38px;padding:0 14px;border-bottom:1px solid var(--rule);background:var(--plane);flex:none}
 #C .cell-hd h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;
   color:var(--ink-2);font-weight:700}
 #C .cell-hd .aux{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
-#C .cell-bd{padding:12px 14px}
+#C .cell-bd{padding:12px 14px;min-width:0}
 #C .cell.span2{grid-column:1/-1}
 #C .topstrip{display:flex;border-bottom:1px solid var(--rule);background:var(--surface);flex-wrap:wrap}
 #C .topstrip .m{padding:11px 16px;border-right:1px solid var(--rule);flex:1 1 150px}
@@ -250,24 +264,8 @@ body:not([data-conn="live"]) .stale{opacity:.5}
   color:var(--ink-3);font-weight:700}
 #C .topstrip .m .v{font-size:19px;font-weight:600;letter-spacing:-.02em;margin-top:3px;
   font-variant-numeric:tabular-nums}
-#C .ctable{width:100%;border-collapse:collapse;font-size:12.5px}
-#C .ctable th{text-align:right;font-size:10px;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--ink-3);font-weight:700;padding:5px 10px 5px 0;
-  border-bottom:1px solid var(--rule-2);white-space:nowrap}
-#C .ctable th:first-child{text-align:left}
-#C .ctable td{text-align:right;padding:7px 10px 7px 0;border-bottom:1px solid var(--rule);
-  white-space:nowrap}
-#C .ctable td:first-child{text-align:left}
-#C .ctable tr:last-child td{border-bottom:0}
 
-.alertrow{display:flex;gap:9px;align-items:flex-start;padding:9px 0;
-  border-bottom:1px solid var(--rule);font-size:12.5px}
-.alertrow:last-child{border-bottom:0}
-.alertrow .when{color:var(--ink-3);font-size:11px;font-variant-numeric:tabular-nums;
-  flex:none;width:42px}
-.alertrow .icon{flex:none;font-weight:700;width:13px;text-align:center}
-
-/* ===================== 原型切換列 ===================== */
+/* ===================== 切換列 ===================== */
 #switcher{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:100;
   display:flex;align-items:stretch;background:#14161a;color:#f2f3f5;border-radius:999px;
   box-shadow:0 6px 26px rgba(0,0,0,.4);font-size:13px;
@@ -285,95 +283,91 @@ body:not([data-conn="live"]) .stale{opacity:.5}
 #switcher .tog b{font-weight:700}
 #switcher .hint{font-size:11px;opacity:.6;padding:0 13px 0 0;display:flex;align-items:center}
 
-/* ---------------- 手機 ---------------- */
-@media (max-width:900px){
-  #D .cols{grid-template-columns:1fr}
+/* ---------------- 響應式 ---------------- */
+@media (max-width:1180px){
+  #D .row2{grid-template-columns:1fr}
 }
 @media (max-width:860px){
+  :root{--pad:14px}
   #A .kpis{grid-template-columns:1fr;gap:10px}
   #A .kpi .v{font-size:28px}
   #B,#D{grid-template-columns:1fr}
+  #D .row2b{grid-template-columns:1fr}
   .side{position:static;height:auto;display:flex;overflow-x:auto;padding:0;
     border-right:0;border-bottom:1px solid var(--rule)}
   .side .brand{display:none}
   .side a{border-left:0;border-bottom:2px solid transparent;white-space:nowrap}
   .side a[aria-current="page"]{border-left:0;border-bottom-color:var(--ink)}
+  .plist{--cols:3px 1fr 116px;padding-right:14px}
   .plist .hd{display:none}
-  .plist{--cols:3px 1fr 116px}
   .plist .row .spark,.plist .row .fig.hide-sm{display:none}
-  #B .plist{padding-right:16px}
   #D .stack{padding:10px}
-  #D .hero .big{font-size:32px}
+  .hero .big{font-size:31px}
   #C .grid{grid-template-columns:1fr}
   #switcher .hint,#switcher .tog-long{display:none}
   #switcher .vlabel{min-width:118px;font-size:12px}
 }
 </style>
 
-<!-- ================= D — 工作台（合成版） ================= -->
+<!-- ================= D — 工作台 ================= -->
 <div id="D" class="variant" hidden>
   <aside class="side">
     <div class="brand">持股儀表板</div>
-    <a href="#" aria-current="page">總覽</a>
-    <a href="#">個股分析</a>
-    <a href="#">警示</a>
-    <a href="#">交易紀錄</a>
-    <a href="#">歷史績效</a>
+    <a href="#" aria-current="page">總覽</a><a href="#">個股分析</a><a href="#">警示</a>
+    <a href="#">交易紀錄</a><a href="#">歷史績效</a>
   </aside>
   <div class="main">
     <div class="stack">
       <div class="banner b-closed"><span>◌</span><span>非交易時段 顯示今日收盤價</span></div>
       <div class="banner b-lost"><span>◈</span><span>行情連線中斷 顯示最後接收到的報價</span></div>
 
-      <!-- 總資產：美化過的主面板 -->
-      <section class="card">
-        <div class="hero">
-          <div>
-            <div class="big-lbl">總資產</div>
-            <div class="big" data-bind="totalValue">—</div>
-          </div>
-          <div class="subs">
-            <div class="s"><div class="l">今日損益</div>
-              <div class="v" data-bind="dayPnlCombo">—</div></div>
-            <div class="s"><div class="l">總報酬</div>
-              <div class="v" data-bind="totalPnlCombo">—</div></div>
-            <div class="s"><div class="l">投入成本</div>
-              <div class="v flat" data-bind="cost">—</div></div>
-          </div>
-        </div>
-        <div class="card-hd" style="border-bottom:0;padding-top:10px">
-          <span class="conn"><span class="dot"></span><span data-conn-label></span></span>
-          <span class="chips" data-chips></span>
-        </div>
-        <div class="card-bd" style="padding:0 18px 16px">
-          <div class="curve-holder" data-curve="D"></div>
-        </div>
-      </section>
-
-      <!-- 持股：B 式列 -->
-      <section class="card">
-        <div class="card-hd"><h2>持股</h2><span class="eyebrow">7 檔 · 依市值排序</span></div>
-        <div class="plist">
-          <div class="hd"><span></span><span class="name">標的</span><span>走勢</span>
-            <span>現價</span><span>市值</span><span>未實現損益</span></div>
-          <div data-rows="D"></div>
-        </div>
-      </section>
-
-      <!-- 底部三欄 -->
-      <div class="cols">
+      <!-- 第一層：總資產 ＋ 警示（警示上移，開頁就看得到） -->
+      <div class="row2">
         <section class="card">
-          <div class="card-hd"><h2>資產配置</h2></div>
-          <div class="card-bd"><div class="alloc" data-alloc="D"></div></div>
+          <div class="hero">
+            <div>
+              <div class="big-lbl">總資產</div>
+              <div class="big" data-bind="totalValue">—</div>
+            </div>
+            <div class="subs">
+              <div class="s"><div class="l">今日損益</div>
+                <div class="v" data-bind="dayPnlCombo">—</div></div>
+              <div class="s"><div class="l">總報酬</div>
+                <div class="v" data-bind="totalPnlCombo">—</div></div>
+              <div class="s"><div class="l">投入成本</div>
+                <div class="v flat" data-bind="cost">—</div></div>
+            </div>
+          </div>
+          <div class="hero-foot">
+            <span class="conn"><span class="dot"></span><span data-conn-label></span></span>
+            <span class="chips" data-chips></span>
+          </div>
+          <div class="card-bd" style="padding:6px var(--pad) 14px">
+            <div class="curve-holder" data-curve="D"></div>
+          </div>
         </section>
+
         <section class="card">
           <div class="card-hd"><h2>警示</h2><span class="eyebrow">今日 3 則</span></div>
-          <div class="card-bd" style="padding:4px 18px 12px" data-alerts></div>
+          <div class="card-bd tight" data-alerts></div>
+        </section>
+      </div>
+
+      <!-- 第二層：持股，全寬 -->
+      <section class="card">
+        <div class="card-hd"><h2>持股</h2><span class="eyebrow">7 檔 · 依市值排序</span></div>
+        <div class="card-bd flush"><div class="htable-wrap" data-holdings="D"></div></div>
+      </section>
+
+      <!-- 第三層：等分兩欄 -->
+      <div class="row2b">
+        <section class="card">
+          <div class="card-hd"><h2>資產配置</h2><span class="eyebrow">依市值</span></div>
+          <div class="card-bd"><div class="alloc" data-alloc></div></div>
         </section>
         <section class="card">
           <div class="card-hd"><h2>最近交易</h2><span class="eyebrow">近 5 筆</span></div>
-          <div class="card-bd" style="padding:6px 18px 12px"
-            data-txns style="overflow-x:auto"></div>
+          <div class="card-bd tight" data-txns></div>
         </section>
       </div>
     </div>
@@ -402,27 +396,27 @@ body:not([data-conn="live"]) .stale{opacity:.5}
     </div>
     <div class="kpis">
       <div class="kpi"><div class="eyebrow">總資產</div>
-        <div class="v num" data-bind="totalValue">—</div>
-        <div class="sub num" data-bind="costPlain">—</div></div>
+        <div class="v" data-bind="totalValue">—</div>
+        <div class="sub" data-bind="costPlain">—</div></div>
       <div class="kpi"><div class="eyebrow">今日損益</div>
-        <div class="v num" data-bind="dayPnl">—</div>
-        <div class="sub num" data-bind="dayPnlPct">—</div></div>
+        <div class="v" data-bind="dayPnl">—</div>
+        <div class="sub" data-bind="dayPnlPct">—</div></div>
       <div class="kpi"><div class="eyebrow">總報酬</div>
-        <div class="v num" data-bind="totalPnl">—</div>
-        <div class="sub num" data-bind="totalPnlPct">—</div></div>
+        <div class="v" data-bind="totalPnl">—</div>
+        <div class="sub" data-bind="totalPnlPct">—</div></div>
     </div>
-    <div class="panel">
-      <div class="panel-hd"><h2>總資產走勢</h2><span class="chips" data-chips></span></div>
-      <div style="padding:4px 22px 20px"><div class="curve-holder" data-curve="A"></div></div>
-    </div>
-    <div class="panel">
-      <div class="panel-hd"><h2>持股</h2><span class="eyebrow">7 檔</span></div>
-      <div class="tblwrap"><table>
-        <thead><tr><th>標的</th><th>現價</th><th>漲跌</th><th>市值</th>
-          <th>未實現損益</th><th>報酬率</th><th>佔比</th></tr></thead>
-        <tbody data-rows="A"></tbody>
-      </table></div>
-    </div>
+    <section class="card">
+      <div class="card-hd"><h2>總資產走勢</h2><span class="chips" data-chips></span></div>
+      <div class="card-bd"><div class="curve-holder" data-curve="A"></div></div>
+    </section>
+    <section class="card">
+      <div class="card-hd"><h2>持股</h2><span class="eyebrow">7 檔</span></div>
+      <div class="card-bd flush"><div class="htable-wrap" data-holdings="A"></div></div>
+    </section>
+    <section class="card">
+      <div class="card-hd"><h2>警示</h2><span class="eyebrow">今日 3 則</span></div>
+      <div class="card-bd tight" data-alerts></div>
+    </section>
   </div>
 </div>
 
@@ -468,30 +462,25 @@ body:not([data-conn="live"]) .stale{opacity:.5}
         <span class="conn"><span class="dot"></span><span data-conn-label></span></span></div></div>
   </div>
   <div class="grid">
-    <div class="cell">
-      <div class="cell-hd"><h2>持股</h2><span class="aux">7 檔 · 依市值</span></div>
-      <div class="cell-bd" style="padding:6px 14px 10px"><div style="overflow-x:auto">
-        <table class="ctable">
-          <thead><tr><th>標的</th><th>現價</th><th>漲跌</th><th>市值</th>
-            <th>未實現</th><th>報酬率</th></tr></thead>
-          <tbody data-rows="C"></tbody>
-        </table></div></div>
-    </div>
-    <div class="cell">
-      <div class="cell-hd"><h2>資產配置</h2><span class="aux">依市值</span></div>
-      <div class="cell-bd"><div class="alloc" data-alloc="C"></div></div>
-    </div>
     <div class="cell span2">
+      <div class="cell-hd"><h2>持股</h2><span class="aux">7 檔 · 依市值</span></div>
+      <div class="cell-bd" style="padding:0"><div class="htable-wrap" data-holdings="C"></div></div>
+    </div>
+    <div class="cell">
       <div class="cell-hd"><h2>總資產走勢</h2><span class="chips" data-chips></span></div>
       <div class="cell-bd"><div class="curve-holder" data-curve="C"></div></div>
     </div>
     <div class="cell">
+      <div class="cell-hd"><h2>資產配置</h2><span class="aux">依市值</span></div>
+      <div class="cell-bd"><div class="alloc" data-alloc></div></div>
+    </div>
+    <div class="cell">
       <div class="cell-hd"><h2>警示</h2><span class="aux">今日 3 則</span></div>
-      <div class="cell-bd" style="padding:4px 14px 12px" data-alerts></div>
+      <div class="cell-bd tight" data-alerts></div>
     </div>
     <div class="cell">
       <div class="cell-hd"><h2>最近交易</h2><span class="aux">近 5 筆</span></div>
-      <div class="cell-bd" style="padding:6px 14px 10px" data-txns></div>
+      <div class="cell-bd tight" data-txns></div>
     </div>
   </div>
 </div>
@@ -511,15 +500,14 @@ body:not([data-conn="live"]) .stale{opacity:.5}
 (function () {
   "use strict";
 
-  /* ---------------- 假資料 ---------------- */
   const HOLDINGS = [
-    { code:"2330", name:"台積電",     mkt:"TWSE", qty:2000, cost: 892.00, px:1146.00, prev:1132.00, cur:"TWD" },
-    { code:"2454", name:"聯發科",     mkt:"TWSE", qty:500,  cost:1180.00, px:1305.00, prev:1318.00, cur:"TWD" },
-    { code:"0050", name:"元大台灣50", mkt:"TWSE", qty:5000, cost: 186.30, px: 221.85, prev: 220.10, cur:"TWD" },
-    { code:"2317", name:"鴻海",       mkt:"TWSE", qty:3000, cost: 168.50, px: 214.50, prev: 213.00, cur:"TWD" },
-    { code:"3037", name:"欣興",       mkt:"TWSE", qty:2000, cost: 182.00, px: 167.50, prev: 171.00, cur:"TWD" },
-    { code:"NVDA", name:"NVIDIA",     mkt:"US",   qty:60,   cost: 148.20, px: 191.40, prev: 188.70, cur:"USD" },
-    { code:"VOO",  name:"Vanguard S&P",mkt:"US",  qty:40,   cost: 512.00, px: 597.30, prev: 596.10, cur:"USD" },
+    { code:"2330", name:"台積電",      mkt:"TWSE", qty:2000, cost: 892.00, px:1146.00, prev:1132.00, cur:"TWD" },
+    { code:"2454", name:"聯發科",      mkt:"TWSE", qty:500,  cost:1180.00, px:1305.00, prev:1318.00, cur:"TWD" },
+    { code:"0050", name:"元大台灣50",  mkt:"TWSE", qty:5000, cost: 186.30, px: 221.85, prev: 220.10, cur:"TWD" },
+    { code:"2317", name:"鴻海",        mkt:"TWSE", qty:3000, cost: 168.50, px: 214.50, prev: 213.00, cur:"TWD" },
+    { code:"3037", name:"欣興",        mkt:"TWSE", qty:2000, cost: 182.00, px: 167.50, prev: 171.00, cur:"TWD" },
+    { code:"NVDA", name:"NVIDIA",      mkt:"US",   qty:60,   cost: 148.20, px: 191.40, prev: 188.70, cur:"USD" },
+    { code:"VOO",  name:"Vanguard S&P",mkt:"US",   qty:40,   cost: 512.00, px: 597.30, prev: 596.10, cur:"USD" },
   ];
   const FX = 32.292;                        // #5 用的央行收盤匯率
   const twd = h => h.cur === "USD" ? FX : 1;
@@ -528,7 +516,6 @@ body:not([data-conn="live"]) .stale{opacity:.5}
   const dirClass = n => n > 0 ? "up" : n < 0 ? "down" : "flat";
   const arrow = n => n > 0 ? "▲" : n < 0 ? "▼" : "—";
 
-  /* 假資產曲線：固定種子，重載不變 */
   const FULL = (() => {
     let v = 1520000, s = 20260201, out = [];
     const rnd = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
@@ -539,17 +526,15 @@ body:not([data-conn="live"]) .stale{opacity:.5}
   let range = 126;
   const curveData = () => FULL.slice(-range);
 
-  /* ---------------- 連線三態 ----------------
-     非交易時段是正常狀態，不用警告色；只有盤中斷線才是異常 */
+  /* 連線三態：非交易時段是正常，只有盤中斷線才是異常 */
   const CONN = [
-    { key:"live",   label:"即時連線 09:00-13:30" },
-    { key:"closed", label:"非交易時段 13:30-09:00" },
-    { key:"lost",   label:"盤中斷線 最後報價 11:42" },
+    { key:"live",   label:"即時連線 09:00-13:30",   short:"即時" },
+    { key:"closed", label:"非交易時段 13:30-09:00", short:"非交易時段" },
+    { key:"lost",   label:"盤中斷線 最後報價 11:42", short:"盤中斷線" },
   ];
   let connIdx = 0;
 
-  /* ---------------- 迷你走勢圖 ---------------- */
-  function sparkline(seed, up, w = 74, h = 26) {
+  function sparkline(seed, up, w = 62, h = 24) {
     let s = seed, pts = [], v = 50;
     const rnd = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
     for (let i = 0; i < 26; i++) { v += (rnd() - (up ? .42 : .58)) * 11; pts.push(v); }
@@ -561,13 +546,12 @@ body:not([data-conn="live"]) .stale{opacity:.5}
       style="display:block;overflow:visible"><path d="${d}" fill="none" stroke="currentColor"
       stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
       <circle cx="${X(pts.length-1).toFixed(1)}" cy="${Y(pts[pts.length-1]).toFixed(1)}"
-      r="2.4" fill="currentColor"/></svg>`;
+      r="2.2" fill="currentColor"/></svg>`;
   }
 
-  /* ---------------- 資產曲線（十字準星 ＋ 端點強調） ---------------- */
   function renderCurve(host) {
     const k = host.dataset.curve, data = curveData();
-    const W = 1000, H = k === "D" ? 180 : (k === "C" ? 150 : 190);
+    const W = 1000, H = k === "D" ? 168 : (k === "C" ? 150 : 190);
     const mn = Math.min(...data), mx = Math.max(...data), rg = (mx - mn) || 1;
     const X = i => (i / (data.length - 1)) * W;
     const Y = v => H - 16 - ((v - mn) / rg) * (H - 34);
@@ -618,100 +602,93 @@ body:not([data-conn="live"]) .stale{opacity:.5}
   function compute() {
     let value = 0, cost = 0, dayPnl = 0;
     HOLDINGS.forEach(h => { const r = twd(h);
-      value += h.px * h.qty * r; cost += h.cost * h.qty * r;
-      dayPnl += (h.px - h.prev) * h.qty * r; });
+      value += h.px*h.qty*r; cost += h.cost*h.qty*r; dayPnl += (h.px-h.prev)*h.qty*r; });
     return { value, cost, dayPnl, totalPnl: value - cost };
   }
 
   const ALERTS = [
-    ["13:24","up","▲","<b>台積電</b> 突破 1,180 目標價"],
-    ["11:07","down","▼","<b>欣興</b> 跌破成本 −8% 停損線"],
-    ["09:31","warn","◈","<b>聯發科</b> 除息日在 3 個交易日後"],
+    ["13:24","up","▲","<b>台積電</b> 突破 1,180 目標價","1,146.00"],
+    ["11:07","down","▼","<b>欣興</b> 跌破成本 −8% 停損線","167.50"],
+    ["09:31","warn","◈","<b>聯發科</b> 除息日在 3 個交易日後","08/06"],
   ];
   const TXNS = [
-    ["07/29","2330","買","up","1,000","1,145.00"],
-    ["07/22","0050","買","up","2,000","218.40"],
-    ["07/15","3037","賣","down","1,000","168.50"],
-    ["07/08","2454","息","flat","—","18,000"],
-    ["06/30","NVDA","買","up","20","183.20"],
+    ["07/29","up","買","<b>台積電</b> 1,000 股 @ 1,145.00","−1,145,000"],
+    ["07/22","up","買","<b>元大台灣50</b> 2,000 股 @ 218.40","−436,800"],
+    ["07/15","down","賣","<b>欣興</b> 1,000 股 @ 168.50","+168,500"],
+    ["07/08","flat","息","<b>聯發科</b> 現金股利","+18,000"],
+    ["06/30","up","買","<b>NVDA</b> 20 股 @ 183.20","−118,300"],
   ];
+
+  /* 持股表：A 的結構 ＋ 走勢圖 ＋ 成本均價 ＋ 報酬率 */
+  function holdingsTable(sorted) {
+    const rows = sorted.map(h => {
+      const r = twd(h), mv = h.px*h.qty*r, chg = h.px-h.prev, pct = chg/h.prev*100,
+            pnl = (h.px-h.cost)*h.qty*r, ror = (h.px-h.cost)/h.cost*100;
+      const seed = h.code.split("").reduce((a,c) => a + c.charCodeAt(0), 7) * 977;
+      return `<tr class="${chg>=0?"is-up":"is-down"}" data-code="${h.code}">
+        <td><span class="sym">${h.name}</span><span class="sym-code"> ${h.code}</span>${
+          h.mkt==="US"?'<span class="mkt-tag">US</span>':""}</td>
+        <td class="spark-cell ${dirClass(chg)}">${sparkline(seed, chg>=0)}</td>
+        <td class="cost">${nf(h.qty)}</td>
+        <td class="cost">${nf(h.cost,2)}</td>
+        <td class="stale">${nf(h.px,2)}</td>
+        <td class="stale ${dirClass(chg)}">${arrow(chg)} ${signed(pct,2)}%</td>
+        <td class="stale">${nf(mv)}</td>
+        <td class="${dirClass(pnl)}">${signed(pnl)}</td>
+        <td class="${dirClass(pnl)}" style="font-weight:620">${signed(ror,1)}%</td></tr>`;
+    }).join("");
+    return `<table class="htable"><thead><tr>
+      <th>標的</th><th>當日走勢</th><th>股數</th><th>成本均價</th><th>現價</th>
+      <th>漲跌</th><th>市值</th><th>未實現損益</th><th>報酬率</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+  }
 
   function renderRows() {
     const t = compute();
     const sorted = [...HOLDINGS].sort((a,b) => b.px*b.qty*twd(b) - a.px*a.qty*twd(a));
-    const m = h => { const r = twd(h);
-      return { mv:h.px*h.qty*r, chg:h.px-h.prev, pct:(h.px-h.prev)/h.prev*100,
-               pnl:(h.px-h.cost)*h.qty*r, ror:(h.px-h.cost)/h.cost*100 }; };
 
-    // A：表格（第一格帶 tick 直條）
-    document.querySelector('[data-rows="A"]').innerHTML = sorted.map(h => {
-      const x = m(h);
-      return `<tr class="${x.chg>=0?"is-up":"is-down"}" data-code="${h.code}">
-        <td><span class="tickbar"></span><span class="cellpad"><span class="sym">${h.name}</span>
-          <span class="sym-code num"> ${h.code}</span>
-          ${h.mkt==="US"?'<span class="mkt-tag">US</span>':""}</span></td>
-        <td><span class="cellpad num stale">${nf(h.px,2)}</span></td>
-        <td><span class="cellpad num stale ${dirClass(x.chg)}">${arrow(x.chg)} ${signed(x.pct,2)}%</span></td>
-        <td><span class="cellpad num stale">${nf(x.mv)}</span></td>
-        <td><span class="cellpad num ${dirClass(x.pnl)}">${signed(x.pnl)}</span></td>
-        <td><span class="cellpad num ${dirClass(x.pnl)}">${signed(x.ror,1)}%</span></td>
-        <td><span class="cellpad num flat">${nf(x.mv/t.value*100,1)}%</span></td></tr>`;
-    }).join("");
+    const html = holdingsTable(sorted);
+    document.querySelectorAll("[data-holdings]").forEach(el => el.innerHTML = html);
 
-    // B 與 D：同一套持股列
-    const listHTML = sorted.map(h => {
-      const x = m(h);
+    // B 保留原本的列樣式供對照
+    document.querySelector('[data-rows="B"]').innerHTML = sorted.map(h => {
+      const r = twd(h), mv = h.px*h.qty*r, chg = h.px-h.prev, pct = chg/h.prev*100,
+            pnl = (h.px-h.cost)*h.qty*r, ror = (h.px-h.cost)/h.cost*100;
       const seed = h.code.split("").reduce((a,c) => a + c.charCodeAt(0), 7) * 977;
-      return `<div class="row ${x.chg>=0?"is-up":"is-down"}" data-code="${h.code}">
+      return `<div class="row ${chg>=0?"is-up":"is-down"}" data-code="${h.code}">
         <div class="tickbar"></div>
         <div class="name"><span class="sym">${h.name}</span>
           <span class="meta">${h.code} · ${nf(h.qty)} 股 · 均價 ${nf(h.cost,2)}</span></div>
-        <div class="spark ${dirClass(x.chg)}">${sparkline(seed, x.chg>=0)}</div>
+        <div class="spark ${dirClass(chg)}">${sparkline(seed, chg>=0, 74, 26)}</div>
         <div class="fig stale">${nf(h.px,2)}
-          <span class="sub ${dirClass(x.chg)}">${signed(x.pct,2)}%</span></div>
-        <div class="fig stale">${nf(x.mv)}<span class="sub">市值</span></div>
-        <div class="fig hide-sm ${dirClass(x.pnl)}">${signed(x.pnl)}
-          <span class="sub ${dirClass(x.pnl)}">${signed(x.ror,1)}%</span></div></div>`;
-    }).join("");
-    document.querySelector('[data-rows="B"]').innerHTML = listHTML;
-    document.querySelector('[data-rows="D"]').innerHTML = listHTML;
-
-    // C：緊湊表格
-    document.querySelector('[data-rows="C"]').innerHTML = sorted.map(h => {
-      const x = m(h);
-      return `<tr class="${x.chg>=0?"is-up":"is-down"}" data-code="${h.code}">
-        <td><span class="sym">${h.code}</span><span class="sym-code"> ${h.name}</span></td>
-        <td class="num stale">${nf(h.px,2)}</td>
-        <td class="num stale ${dirClass(x.chg)}">${signed(x.pct,2)}%</td>
-        <td class="num stale">${nf(x.mv)}</td>
-        <td class="num ${dirClass(x.pnl)}">${signed(x.pnl)}</td>
-        <td class="num ${dirClass(x.pnl)}">${signed(x.ror,1)}%</td></tr>`;
+          <span class="sub ${dirClass(chg)}">${signed(pct,2)}%</span></div>
+        <div class="fig stale">${nf(mv)}<span class="sub">市值</span></div>
+        <div class="fig hide-sm ${dirClass(pnl)}">${signed(pnl)}
+          <span class="sub ${dirClass(pnl)}">${signed(ror,1)}%</span></div></div>`;
     }).join("");
 
-    // 資產配置：排序長條 ＋ 每列直接標示（relief 規則）
+    // 資產配置
     const slots = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)","var(--s5)"];
     const top = sorted.slice(0,4).map((h,i) => ({ nm:h.name, v:h.px*h.qty*twd(h), c:slots[i] }));
     top.push({ nm:"其他 3 檔", v:sorted.slice(4).reduce((a,h)=>a+h.px*h.qty*twd(h),0), c:slots[4] });
     const mxv = Math.max(...top.map(s => s.v));
     const allocHTML = top.map(s => `<div class="r">
-      <span class="nm"><span class="sw" style="background:${s.c}"></span>
-        <span>${s.nm}</span></span>
+      <span class="nm"><span class="sw" style="background:${s.c}"></span><span>${s.nm}</span></span>
       <span class="pc">${nf(s.v/t.value*100,1)}%</span>
       <span class="track"><i style="width:${(s.v/mxv*100).toFixed(1)}%;background:${s.c}"></i></span>
       <span class="mv">NT$${nf(s.v)}</span></div>`).join("");
     document.querySelectorAll("[data-alloc]").forEach(el => el.innerHTML = allocHTML);
 
-    // 警示與交易（D 與 C 共用）
-    const alertHTML = ALERTS.map(([w,c,i,txt]) => `<div class="alertrow">
+    // 警示與交易：同一種列節奏 → 並排才對稱
+    const alertHTML = ALERTS.map(([w,c,i,txt,amt]) => `<div class="lrow">
       <span class="when">${w}</span>
-      <span class="icon ${c==="warn"?"":c}" ${c==="warn"?'style="color:var(--warn)"':""}>${i}</span>
-      <span>${txt}</span></div>`).join("");
+      <span class="icon ${c==="warn"?"":c}"${c==="warn"?' style="color:var(--warn)"':""}>${i}</span>
+      <span class="what">${txt}</span><span class="amt">${amt}</span></div>`).join("");
     document.querySelectorAll("[data-alerts]").forEach(el => el.innerHTML = alertHTML);
-    const txnHTML = `<table class="ctable"><thead><tr><th>日期</th><th>標的</th><th>別</th>
-      <th>股數</th><th>價格</th></tr></thead><tbody>` +
-      TXNS.map(([d,c,k,cl,q,p]) => `<tr><td>${d}</td><td>${c}</td>
-        <td class="${cl}">${k}</td><td class="num">${q}</td><td class="num">${p}</td></tr>`).join("") +
-      `</tbody></table>`;
+
+    const txnHTML = TXNS.map(([d,c,k,txt,amt]) => `<div class="lrow">
+      <span class="when">${d}</span><span class="icon ${c}">${k}</span>
+      <span class="what">${txt}</span><span class="amt">${amt}</span></div>`).join("");
     document.querySelectorAll("[data-txns]").forEach(el => el.innerHTML = txnHTML);
 
     bind(t);
@@ -736,7 +713,6 @@ body:not([data-conn="live"]) .stale{opacity:.5}
       signed(t.totalPnl/t.cost*100,1)}%)</span>`, t.totalPnl);
   }
 
-  /* ---------------- tick：一律細直條，背景不動 ---------------- */
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function tick() {
     if (document.body.dataset.conn !== "live" || reduce) return;
@@ -749,7 +725,6 @@ body:not([data-conn="live"]) .stale{opacity:.5}
     });
   }
 
-  /* ---------------- 期間 chips ---------------- */
   function renderChips() {
     document.querySelectorAll("[data-chips]").forEach(host => {
       host.innerHTML = RANGES.map(([lbl, n]) =>
@@ -761,8 +736,7 @@ body:not([data-conn="live"]) .stale{opacity:.5}
     });
   }
 
-  /* ---------------- 切換器 ---------------- */
-  const VARIANTS = [["D","工作台（合成）"],["A","總覽優先"],["B","部位優先"],["C","全景網格"]];
+  const VARIANTS = [["D","工作台"],["A","總覽優先"],["B","部位優先"],["C","全景網格"]];
   const qs = new URLSearchParams(location.search);
   let cur = (qs.get("variant") || "D").toUpperCase();
   if (!VARIANTS.some(v => v[0] === cur)) cur = "D";
@@ -795,17 +769,12 @@ body:not([data-conn="live"]) .stale{opacity:.5}
     const c = CONN[connIdx];
     document.body.dataset.conn = c.key;
     document.querySelectorAll("[data-conn-label]").forEach(el => el.textContent = c.label);
-    document.getElementById("connLbl").textContent =
-      c.key === "live" ? "即時" : c.key === "closed" ? "非交易時段" : "盤中斷線";
+    document.getElementById("connLbl").textContent = c.short;
   }
   document.getElementById("connTog").onclick = () => {
-    connIdx = (connIdx + 1) % CONN.length; applyConn();
-  };
+    connIdx = (connIdx + 1) % CONN.length; applyConn(); };
 
-  applyConn();
-  renderChips();
-  renderRows();
-  show(cur, false);
+  applyConn(); renderChips(); renderRows(); show(cur, false);
   setInterval(tick, 1100);
 })();
 </script>
