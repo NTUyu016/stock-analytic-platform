@@ -6,6 +6,24 @@
 
 ## Language
 
+### 使用者與身分
+
+**User（使用者）**：
+擁有 Portfolio、Transaction 與 Alert 的那個人。v1 只會有一位，但所有個人資料自始以 `user_id` 歸屬於他。
+_Avoid_: Account, 帳號, Owner
+
+**Identity（身分）**：
+User 用來登入的其中一個外部帳號，由「provider + 該 provider 給的穩定識別碼」唯一確定。**一個 User 可以有多個 Identity**（Google 與 GitHub 是兩個 Identity，同一個人）。這是備援登入成立的前提。
+_Avoid_: Login, 帳號, Credential
+
+**Provider（身分提供者）**：
+簽發 Identity 的外部服務，如 `google`、`github`。與 Provider Symbol 的「資料源」是不同概念，勿混用。
+_Avoid_: IdP, 登入方式
+
+**Session（工作階段）**：
+一次登入的存續狀態，落地儲存因此**可被撤銷**。與 Identity 的差別：Identity 是「你是誰」（長期不變），Session 是「你現在登入著」（隨時可作廢）。
+_Avoid_: Token, Cookie, 登入狀態
+
 ### 標的與市場
 
 **Instrument（標的）**：

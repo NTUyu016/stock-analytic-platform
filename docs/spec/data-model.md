@@ -10,6 +10,7 @@
 2. **金額一律存原幣別**，每張表帶 `currency`；換算成台幣只發生在顯示層。
 3. **即時報價不落地**；每日收盤價與每日匯率落地。
 4. **參考資料與個人資料分離**：`instrument`、`daily_close`、`exchange_rate` 全域共用不帶 `user_id`；`portfolio`、`transaction`、`alert` 帶 `user_id`。
+5. **所有涉及使用者資料的查詢，從第一天就帶 `WHERE user_id = ?`**。v1 只有一列使用者，此條件恆為真、是無害的冗餘；多人化時它是唯一的防線，且**漏掉不會有任何錯誤訊息**（[#10](https://github.com/NTUyu016/stock-analytic-platform/issues/10)）。
 
 ## 表
 
@@ -17,10 +18,42 @@
 | 欄位 | 型別 | 說明 |
 |---|---|---|
 | `id` | `bigserial` PK | |
-| `email` | `text` UNIQUE | v1 只會有一列 |
+| `email` | `text` | **聯絡用主 email，不是登入識別**。可為空 |
+| `display_name` | `text` | |
 | `created_at` | `timestamptz` | |
 
-> 認證方式見 [issue #10](https://github.com/NTUyu016/stock-analytic-platform/issues/10)，本表僅保證 `user_id` 外鍵自始存在。
+- v1 只會有一列，由 CLI 指令建立（見 [`auth.md`](./auth.md) §8）。
+- **`email` 的 UNIQUE 約束已於 [#10](https://github.com/NTUyu016/stock-analytic-platform/issues/10) 移除** —— 登入識別移到 `user_identity`，本欄降為聯絡欄位。
+
+### `user_identity`
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `id` | `bigserial` PK | |
+| `user_id` | `bigint` FK → `app_user` | **一個人可以有多列** |
+| `provider` | `text` | `google` / `github` |
+| `subject` | `text` | provider 給的**穩定識別碼** |
+| `email` | `text` | 該身分當下的 email。**僅供顯示與人工比對，不參與任何判斷** |
+| `created_at` | `timestamptz` | |
+| `last_used_at` | `timestamptz` | |
+
+- UNIQUE `(provider, subject)`
+- 各 provider 的 `subject` 來源：`google` 取 ID token 的 `sub`；`github` 取 `GET /user` 回應的數字 `id`（**不可用 `login`，它可以改**）。
+- **這張表是 [#10](https://github.com/NTUyu016/stock-analytic-platform/issues/10) 對本文件的修訂**。原設計 `app_user.email` UNIQUE 隱含「一個人 = 一個 email = 一種登入方式」，使得「換一個 provider 登入」等於改寫自己的身分列 —— 而那正是被鎖在門外時做不到的事。拆表後備援登入才成立。
+- ⚠️ **key 絕不可用 email**。Google 官方明載 email 可變、且 Workspace 帳號刪除後同一 email 可再發給新的人，那個人會繼承存取權。詳見 [`auth.md`](./auth.md) §6。
+- 它同時是「日後開放註冊」的預留：多人化時本表**一行都不用改**，只是列數變多。
+
+### `session`
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `id` | `text` PK | 隨機字串本身，非序號 |
+| `user_id` | `bigint` FK | |
+| `created_at` | `timestamptz` | |
+| `expires_at` | `timestamptz` | 30 天滑動續期 |
+| `last_seen_at` | `timestamptz` | |
+
+- INDEX `(expires_at)` — 清理過期列
+- **必須落地，不可存行程記憶體** —— `api` 走 scale-to-zero（[#17](https://github.com/NTUyu016/stock-analytic-platform/issues/17)），停機重啟會把記憶體裡的 session 全部丟掉。理由不是「多機器共享」，是停機。
+- 落地的另一個好處是**可撤銷**：刪一列即登出，這正是不用 JWT 的主因。詳見 [`auth.md`](./auth.md) §5。
 
 ### `instrument`
 | 欄位 | 型別 | 說明 |
@@ -141,6 +174,7 @@
 
 ## 已知待補
 
+- 認證流程的完整規格（provider 接法、逃生階梯、cookie 屬性） → [`auth.md`](./auth.md)
 - 費用與稅欄位的計算規則 → [#6](https://github.com/NTUyu016/stock-analytic-platform/issues/6)
 - `alert.condition` 的具體結構 → [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15)
 - 個股分析結果要不要落地快取 → [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14)
