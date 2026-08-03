@@ -73,11 +73,13 @@
 | 欄位 | 型別 | 說明 |
 |---|---|---|
 | `instrument_id` | `bigint` FK | |
-| `provider` | `text` | `yfinance` / `shioaji` / `fugle` / `twse_openapi` |
-| `provider_symbol` | `text` | `2330.TW` / `2330` |
+| `provider` | `text` | `yfinance` / `shioaji` / `fugle` / `twse_openapi` / `cathay_statement` |
+| `provider_symbol` | `text` | `2330.TW` / `2330` / `台積電` |
 
 - PK `(instrument_id, provider)`；UNIQUE `(provider, provider_symbol)`
 - **這張表是換資料源不用搬資料庫的關鍵**。行情源尚未定案（[#2](https://github.com/NTUyu016/stock-analytic-platform/issues/2) / [#8](https://github.com/NTUyu016/stock-analytic-platform/issues/8)），此設計讓該決策不污染核心模型。
+- **[#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 擴充了它的用途**：券商對帳單只給中文簡稱、不給代號，因此把券商也當成一個 `provider`（`cathay_statement`），簡稱當成它的 `provider_symbol`。`UNIQUE (provider, provider_symbol)` 正好給出「一個券商簡稱只能對到一支標的」的保證。本表當初為「換行情源」而設計，未預料到此用途卻剛好接得住。
+- ⚠️ **查詢順序必須是「先查本表，未命中才打官方 API」**，不可反過來。API 回的是今日快照會隨改名漂移，本表是凍結的歷史事實。詳見 [`transaction-input.md`](./transaction-input.md) §5。
 
 ### `portfolio`
 | 欄位 | 型別 | 說明 |
@@ -106,10 +108,13 @@
 | `cash_amount` | `numeric(20,4)` | 現金股利總額（`CASH_DIVIDEND` 用） |
 | `currency` | `char(3)` | 冗餘自 instrument，凍結交易當下的幣別 |
 | `note` | `text` | `ADJUSTMENT` 必填原因 |
+| `external_ref` | `text` | 匯入來源的自然鍵。可為空（手動輸入） |
 | `created_at` | `timestamptz` | |
 
 - INDEX `(portfolio_id, instrument_id, traded_on)` — 推導 Position 的主要查詢路徑
 - INDEX `(user_id, traded_on)` — 歷史資產曲線
+- UNIQUE `(user_id, external_ref)` WHERE `external_ref IS NOT NULL` — **匯入的冪等性靠它**（[#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19)）
+- `external_ref` 的內容是 `(券商, 成交日, 委託書號)` 的組合。**鍵裡必須有成交日** —— 委託書號在單日內唯一是確定的，跨日全域唯一則是未證實的假設（台股委託書號傳統上 5 碼且逐日回收）。加日期成本為零，賭錯的代價是靜默吃掉一筆真交易。詳見 [`transaction-input.md`](./transaction-input.md) §6。
 - 各類型的欄位語意：
   - `BUY` / `SELL`：`quantity` + `price` + `fee` + `tax`
   - `CASH_DIVIDEND`：只有 `cash_amount`，不改股數，**降低成本基礎**
@@ -163,6 +168,38 @@
 
 > 管道選型見 [issue #7](https://github.com/NTUyu016/stock-analytic-platform/issues/7) 的研究結論。
 
+### `pending_action`
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `id` | `bigserial` PK | |
+| `user_id` | `bigint` FK | |
+| `kind` | `text` | `CORPORATE_ACTION` / `IMPORT_CONFLICT` |
+| `instrument_id` | `bigint` FK | 可為空 |
+| `effective_on` | `date` | 除權息基準日 |
+| `proposed` | `jsonb` | 系統算出的預填值 |
+| `source` | `text` | 產生來源，如 `twse_TWT48U_ALL` |
+| `created_at` | `timestamptz` | |
+
+- 待使用者確認的項目。**確認後才 INSERT 進 `transaction`，本表列刪除或標記已處理。**
+- ⚠️ **這張表存在的唯一理由，是不要在 `transaction` 加 `status` 欄。** 加 `status` 會讓每個查詢都必須記得寫 `WHERE status = 'confirmed'`，而**漏寫不會有任何錯誤訊息** —— 只會讓未確認的股利偷偷混進損益與成本基礎。這與本文核心原則第 5 條、以及 [#10](https://github.com/NTUyu016/stock-analytic-platform/issues/10) 對 `user_id` 的警告是同一個形狀。
+- 另立表則讓 `transaction` 維持「**裡面每一列都是事實**」的不變量，**現有查詢一行都不用改**。
+- 決策來源：[#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19)，詳見 [`transaction-input.md`](./transaction-input.md) §8。
+
+### `reconciliation`
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `id` | `bigserial` PK | |
+| `user_id` | `bigint` FK | |
+| `reconciled_at` | `timestamptz` | |
+| `as_of_date` | `date` | 對帳基準日 |
+| `is_balanced` | `boolean` | 平／不平 |
+| `differences` | `jsonb` | 差異明細（標的、推導股數、券商股數） |
+
+- 使用者貼上券商庫存股數後，系統與推導出的 Position 比對，把**結果**存為一筆稽核紀錄。
+- **只比股數，不比均價。** 股數是整數且無歧義；均價有定義分歧（[#6](https://github.com/NTUyu016/stock-analytic-platform/issues/6) §4.2、§5.2 的股利雙軌問題），拿它對帳會產生永遠對不平的雜訊，而永遠亮著的警告等同沒有警告。
+- ⚠️ **不存庫存本身** —— 那等於偷偷建了下方明令不做的 `position` 表。本表存的是「一個已發生的比對事件」，不是可推導狀態的快照，故不違反核心原則第 1 條。
+- 決策來源：[#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19)，詳見 [`transaction-input.md`](./transaction-input.md) §9。
+
 ## 刻意不做的表
 
 | 沒有這張表 | 原因 |
@@ -175,7 +212,7 @@
 ## 已知待補
 
 - 認證流程的完整規格（provider 接法、逃生階梯、cookie 屬性） → [`auth.md`](./auth.md)
-- 費用與稅欄位的計算規則 → [#6](https://github.com/NTUyu016/stock-analytic-platform/issues/6)
+- ~~費用與稅欄位的計算規則~~ → **已由 [#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 補齊**，見 [`transaction-input.md`](./transaction-input.md) §2（含元以下進位規則，由實際對帳單反推）
 - `alert.condition` 的具體結構 → [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15)
 - 個股分析結果要不要落地快取 → [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14)
 - 績效演算法（TWR / XIRR）需要哪些額外欄位 → [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16)

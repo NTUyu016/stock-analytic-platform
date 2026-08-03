@@ -66,6 +66,7 @@ _Avoid_: Holding, 庫存, 持股
 
 **Cost Basis（成本基礎）**：
 Position 中每股的取得成本，以**加權平均**計算，並計入手續費與交易稅。與券商對帳單上的「均價」對應。
+⚠️ **注意詞彙衝突**：國泰證券對帳單有一欄叫「成本」，那是**單筆成交總額**（股數 × 成交價），與本詞完全無關。匯入時它映射為成交金額，不是 Cost Basis。
 _Avoid_: Average price, 成本價, 買進價
 
 **Realized P&L（已實現損益）**：
@@ -75,6 +76,24 @@ _Avoid_: Profit, 獲利, 實現利益
 **Unrealized P&L（未實現損益）**：
 Position 目前市值與其成本基礎總額的差額。隨市價逐筆變動。
 _Avoid_: Paper gain, 帳面損益, 浮動損益
+
+### 輸入與對帳
+
+**Import（匯入）**：
+把一份外部檔案（券商對帳單或中性格式 CSV）轉成 Transaction 的一次操作。**具原子性——全成功或全不進**，不存在進了一半的狀態。
+_Avoid_: Upload, 上傳, 同步
+
+**External Ref（來源自然鍵）**：
+一筆 Transaction 在其匯入來源中的唯一識別，由「券商 + 成交日 + 委託書號」組成。它讓重複匯入同一份檔案不會產生重複列。手動輸入的 Transaction 沒有 External Ref。
+_Avoid_: Import ID, 外部 ID, 交易編號
+
+**Pending Action（待確認項）**：
+系統推測出、但尚未經使用者確認的一筆變動，如自動偵測到的除權息。**它不是 Transaction** —— 只有確認之後才會成為 Transaction。這個區分是刻意的：Transaction 表裡每一列都必須是事實。
+_Avoid_: Draft, 草稿, 暫存交易
+
+**Reconciliation（對帳）**：
+拿券商的庫存股數與系統推導出的 Position 比對的一次事件，結果落地為稽核紀錄。**只比股數不比均價**，因為股數無歧義而均價有定義分歧。對帳結果不是事實來源，只是一次比對的紀錄。
+_Avoid_: Sync, 校驗, 盤點
 
 ### 價格
 
