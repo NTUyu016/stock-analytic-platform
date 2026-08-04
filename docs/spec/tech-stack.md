@@ -177,15 +177,19 @@ v1 預期的路徑是**先用 Fugle 免費層（5 檔訂閱、零開戶、NT$0�
 
 **因此規定**：`src/core/` 內的領域型別**不得出現任何特定 provider 的欄位命名或列舉值**。所有 provider 專屬結構止於 adapter 邊界，向內只交出統一的 Quote 型別。§7 的契約測試對每個 provider 各跑一份，用同一組斷言。
 
+**[#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) 擴充了這條規則：額度限制也是 provider 的屬性，同樣不得滲進核心。** 上面只講了資料格式差異，但 Fugle 免費層 5 訂閱／1 連線、Shioaji 200 訂閱／5 連線——這些數字若寫死在核心，換源時要改的就不只是設定。因此每個 adapter 宣告一份 `ProviderCapabilities`（`max_subscriptions`、`max_connections`、`supports_snapshot`、`supports_odd_lot`），而 **`src/core/` 內不得出現字面量 `5`**。詳見 [`realtime-quotes.md`](./realtime-quotes.md) §2。
+
 **一個現在就要知道的坑**：[#2 §2.1](../research/tw-realtime-quote-sources.md) 查證，**Fugle 基本用戶（免費）方案「快照」欄位是「不支援」**。這直接打到上面「`quote-worker` 缺席時開頁抓一次快照」的降級路徑——在 Fugle 免費層做不到。
 
 **因此降級路徑改用 yfinance 取延遲報價**，不依賴行情 provider 的快照 API。這也正好說明為什麼報價來源必須抽象化：來源不只一個，而且各有各的洞。
 
+> **[#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) 修訂此段的處理方式**：這個坑本身就是一個 capability 差異，卻被寫死成「另一條路徑」。改為讀 `supports_snapshot` 之後，轉 Shioaji 時快照路徑會**自動可用，不需要有人記得回來改**——寫死的降級路徑會一直留在那裡，即使它的前提早已消失。
+
 ### 兩個單元之間怎麼傳 tick
 
-**留給 [#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) 決定。** 已知選項：Postgres `LISTEN/NOTIFY`（零額外元件，Postgres 本來就在）或 Redis pub/sub。本文只確定「有兩個單元」這個形狀。
+**已由 [#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) 答畢，見 [`realtime-quotes.md`](./realtime-quotes.md)**：選 **Postgres `LISTEN/NOTIFY`**，不引入 Redis——決定性理由不是效能（上界僅 1.25 則/秒），而是 **`api` 必須先醒著持有 `LISTEN` 才收得到 tick**，「沒人在看就不花錢」由架構保證；若 worker 直推 `api`，行情流會把 scale-to-zero 的 `api` 整個盤中叫醒。
 
-同樣留給 #13 的還有：瀏覽器端走 WebSocket 還是 SSE、`quote_worker` 內部用原生 binding 還是本機 HTTP server、推播節流頻率。
+同批答畢的還有：瀏覽器端走 **SSE**（上行需求為零，且 `curl -N` 可在正式站直接除錯）、`quote_worker` 內部用**原生 binding**（Fugle 沒有本機 server，走 sidecar 會讓兩家 provider 形狀不一致）、推播節流為 **800ms 全域節拍批次送**。
 
 ---
 
