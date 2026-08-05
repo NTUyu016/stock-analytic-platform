@@ -2,9 +2,53 @@
 
 決策來源：[issue #13](https://github.com/NTUyu016/stock-analytic-platform/issues/13)。名詞定義見 [`CONTEXT.md`](../../CONTEXT.md)，技術棧見 [`tech-stack.md`](./tech-stack.md)，介面規則見 [`dashboard-ui.md`](./dashboard-ui.md)。
 
-前置研究：[#2 台股即時報價來源選型](../research/tw-realtime-quote-sources.md)。
+前置研究：[#2 台股即時報價來源選型](../research/tw-realtime-quote-sources.md)、[Fugle 免費層能力逐項查證](../research/fugle-free-tier-capabilities.md)。
 
 > 本文回答的是：**行情從資料源進來之後，怎麼流到瀏覽器。** 與 `tech-stack.md` 的分工是——那份決定「有 `api` 與 `quote-worker` 兩個部署單元」這個形狀，本文決定它們之間、以及它們對外的每一條通道。
+
+---
+
+## ⚠️ 2026-08-06 事實更正：本文有三處對 Fugle 免費層能力的敘述經查證為錯
+
+#13 定案時，Fugle 免費層各頻道的實際能力**從未被逐項查證**——當時的依據是 #2 的研究，而 #2 的主題是 Shioaji，Fugle 只是備援。2026-08-06 的[逐項查證](../research/fugle-free-tier-capabilities.md)（來源為富果官方 `llms-full.txt` 全文檔）發現三處錯誤。
+
+**本節只更正事實，不重新決策。** 受影響的決策標示為「待重新決定」，由 [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 一併處理。
+
+| # | 本文原本說 | 查證後的事實 | 後果 |
+|---|---|---|---|
+| 1 | 「Fugle 免費層沒有快照 API」，故 §7 第 3 層降級走 **yfinance（延遲 15 分鐘）** | **不支援的只有全市場快照 `/snapshot/*`。單一標的的 `GET /intraday/quote/{symbol}` 免費層可用，60 次/分鐘**，回傳含最佳五檔、累計量、暫停交易旗標，且與 WebSocket **同源同定義** | §7 第 3 層走 yfinance 是**不必要的降級**：異機構、異定義、延遲 15 分鐘，換來的東西 Fugle 本來就給。<br>`supports_snapshot: bool` **粒度不足**，至少要拆成 `supports_symbol_quote` 與 `supports_market_snapshot`。<br>⚠️ 更危險的是 §2 稱這個布林值讓「轉 Shioaji 時快照路徑自動可用」——**布林值定義錯了，那個「自動」就自動到錯的地方去**，Fugle 會被永久標成 `False`，明明有能力卻永遠降級。<br>**→ 待重新決定** |
+| 2 | 「訂閱上限 **5 檔**」（§2/§3/§5/§10 共四處） | 官方定義是「每個訂閱數對應 **1 檔股票 × 1 種資料類型（Channel）**」。5 個額度 = **5 個 (標的, 頻道) 配對** | **5 檔持股只能訂一個頻道。** `trades`＋`books` 就是 10 個，超過一倍。<br>`max_subscriptions` 的**單位有歧義**：核心程式拿它跟「持股檔數」比大小，只在「每檔恰好訂一個頻道」時才對；Shioaji 的額度單位是「檔」，兩家不同——正是 §2 要求 adapter 吸收的那類差異，但目前欄位名沒表達出來。<br>**→ 待重新決定**（見下方「新暴露的取捨」） |
+| 3 | 「盤中零股是 Shioaji **才**具備的能力，Fugle 未查證，不押注」（§8、§10 條目 5） | Fugle 的 `trades`/`books`/`candles`/`aggregates` **四個頻道都有 `intradayOddLot` 參數**，REST 有 `type=oddlot`，未標付費專屬 | **「Shioaji 才有」這句話不成立**，`supports_odd_lot: fugle_free=False` 是錯的。<br>但 **§8 的結論（09:00–13:35，不涵蓋盤後零股）仍然正確**——爭議時段是 13:40–14:30 的**盤後**零股，那個在 Fugle 文件裡仍然查不到；且額度也擠不出來。<br>**要改的是理由，不是結論**：§10 條目 5 的解除條件不是「轉 Shioaji」，而是**訂閱額度**。 |
+
+### 新暴露的取捨：`trades` 與 `aggregates` 互斥
+
+這是 5 個額度造成的、#13 定案時不知道的選擇：
+
+| 選 `trades`（5 訂閱） | 選 `aggregates`（5 訂閱） |
+|---|---|
+| ✅ **逐筆**成交，帶流水號與微秒時間戳 | ❌ 聚合後的當前狀態，**逐筆流消失** |
+| ✅ 「穿越門檻」與「單筆大量」警示可行 | ❌ 上述兩種警示的 worker 端優勢**歸零** |
+| ❌ 不含最佳五檔 | ✅ 含最佳五檔、內外盤量、成交筆數 |
+| ❌ 漲跌幅需自行由 `previousClose` 算 | ✅ provider 算好 `change`/`changePercent`（但**含試撮**） |
+
+> **它同時是 [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15)（警示）與 [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14)（分析頁）之間一條未被記錄的耦合**：選 `trades` = 警示精度優先，選 `aggregates` = 畫面資訊量優先。額度不允許兩者兼得。
+
+### 三處經查證**成立**的敘述（不是更正，是確認）
+
+| 出處 | 敘述 | 結果 |
+|---|---|---|
+| §6 | 統一 Quote 的量一律為**當日累積成交量** | ✅ 成立**且零成本**——`trades.volume` 直接就是累積量，adapter 不需自行累加，也沒有「worker 重啟累加值歸零」的坑 |
+| §8 | Fugle 每 30 秒送 heartbeat，用來區分休市與斷線 | ✅ 官方明文成立 |
+| §2 | SDK callback 不在 event loop 上，只能 `call_soon_threadsafe` | ✅ **原始碼層級佐證**成立（SDK 用 `Thread(target=run_forever)`） |
+
+### 另外兩件必須寫進 adapter 的事（原文完全沒有）
+
+1. **`isTrial` 試撮旗標必須濾掉。** 08:30–09:00 與 13:25–13:30 的試撮價會照常推送。未濾會用**不會成交的假價格**觸發警示——且不會有任何錯誤訊息。
+2. **`trades.volume` 是非必填欄位**，官方範例中盤後定價那筆就缺席。**缺席不可當 0**（當 0 會讓「累積量」倒退，任何以量為基準的判斷都會錯亂）。
+
+### §9 的退避參數沒有 Fugle 依據
+
+§9 整套推導（登入額度百分比、「停權期間反覆重試會延長停權」）**來源全部是 Shioaji**。Fugle 對重連頻率與停權機制**零公布**。這不是錯誤，但現行行文會讓讀者以為那些數字對現行 provider 也有官方依據——**§9 需加註依據來源與適用 provider**。
 
 ---
 
