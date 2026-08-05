@@ -19,7 +19,7 @@
 | 檔案 | 對應票 | 狀態 |
 |---|---|---|
 | [`14-analysis-dimensions.md`](./14-analysis-dimensions.md) | [#14 個股分析頁的台股指標集合](https://github.com/NTUyu016/stock-analytic-platform/issues/14) | 待 grilling |
-| [`15-alerts.md`](./15-alerts.md) | [#15 警示的觸發模型與通知管道](https://github.com/NTUyu016/stock-analytic-platform/issues/15) | 待 grilling |
+| [`15-alerts.md`](./15-alerts.md) | [#15 警示的觸發模型與通知管道](https://github.com/NTUyu016/stock-analytic-platform/issues/15) | ⚠️ **部分過時**（管道改 Discord、待決 3/6/8 已答）— 見檔首更新欄與 [#15 留言](https://github.com/NTUyu016/stock-analytic-platform/issues/15) |
 | [`16-performance.md`](./16-performance.md) | [#16 歷史快照與績效計算策略](https://github.com/NTUyu016/stock-analytic-platform/issues/16) | 待 grilling |
 | [`bench/`](./bench/) | #16 的效能實測腳本與原始輸出 | 證據 |
 
