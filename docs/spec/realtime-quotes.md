@@ -242,6 +242,34 @@ Redis 的 pub/sub 語意與 `LISTEN/NOTIFY` 完全一樣（都是 fire-and-forge
 
 > 這與 [#2 §2.7](../research/tw-realtime-quote-sources.md) 記載永豐官方 Pro App 的「SSE 重連後自動重新訂閱全部商品」是同一個形狀：**斷線是常態，重連後的重建是必要設計，不是例外處理。**
 
+#### 2026-08-06 查證：上面那段預言是字面成立的，而且門檻更短
+
+[託管平台排程與 DB 休眠查證](../research/scheduling-and-db-sleep.md) §4 證實 Neon 官方 compatibility 文件幾乎是為這個情境寫的：
+
+> "…**notifications and listeners defined using NOTIFY/LISTEN commands only exist for the duration of the current session and are lost when the session ends.**"
+> "**The Neon cloud service automatically closes idle connections after a period of inactivity.**"
+
+門檻是 **5 分鐘**（不是本文原本假設的十分鐘），且 **Neon Free plan 的 scale-to-zero 設定是固定的、關不掉**（關閉需付費方案，而關掉就等於 24/7 計費）。
+
+**上面第 1 條的 keepalive 確實擋得住**——判準是「有沒有 query」而不是「有沒有連線」。代價是 keepalive 讓 compute 在盤中永不休眠，開始消耗免費層額度。
+
+### ⚠️ 硬性規則：listener 一律走 direct connection，不得走 pooled endpoint
+
+這是 2026-08-06 查證新增的規則，#13 定案時未知。
+
+**transaction 模式的連線池會在每個 transaction 結束後把連線收回池子，`LISTEN` 因此完全失效**——而預算內的託管方案幾乎都是 transaction 模式：
+
+| 託管方案 | pooler 模式 | pooled endpoint 支不支援 `LISTEN/NOTIFY` |
+|---|---|---|
+| Neon | PgBouncer **transaction** | **❌ 官方明列不支援**（可用去掉 `-pooler` 後綴的 direct 連線繞過） |
+| Render Postgres 付費 | PgBouncer **transaction** | **❌ 官方明列不支援**，官方把 `LISTEN`/`NOTIFY` 列為必須繞過連線池的功能 |
+| Supabase（Supavisor） | 6543 transaction／5432 session | ⚠️ **未能查證**——官方只講 prepared statements，對 `LISTEN/NOTIFY` 隻字未提 |
+| Fly Managed Postgres | PgBouncer **預設 session** | ✅ **唯一官方明文說可用**，direct URL 文件直接寫 "Use this for migrations, advisory locks, or `LISTEN/NOTIFY`" |
+
+**為什麼必須寫成規則而不是備註**：「serverless 就該用 pooled connection」是一條非常強的直覺，日後任何人（包含 agent）依它把連線字串改回 pooled，**報價扇出會在完全沒有錯誤訊息的情況下靜止**——`LISTEN` 指令本身不會報錯，只是永遠收不到通知。這與本專案反覆點名的靜默失效形態相同。
+
+> 連線數不是問題：Neon 的 `max_connections` 最小也有 100 條。
+
 ### 頻道
 
 | 頻道 | 方向 | 內容 |
