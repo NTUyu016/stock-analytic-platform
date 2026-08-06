@@ -154,10 +154,35 @@
 |---|---|---|
 | `currency` | `char(3)` | 對 TWD |
 | `rate_date` | `date` | |
-| `rate` | `numeric(20,8)` | 1 單位外幣 = ? TWD |
+| `cash_buy` | `numeric(20,8)` | 現金買入（原始牌價） |
+| `cash_sell` | `numeric(20,8)` | 現金賣出（原始牌價） |
+| `spot_buy` | `numeric(20,8)` | 即期買入（原始牌價） |
+| `spot_sell` | `numeric(20,8)` | 即期賣出（原始牌價） |
+| `rate` | `numeric(20,8)` **GENERATED** | `(spot_buy + spot_sell) / 2` STORED。1 單位外幣 = ? TWD |
+| `source` | `text` | |
 
 - PK `(currency, rate_date)`
-- 歷史績效一律取當日匯率；查無當日（假日）時取前一個有值的日期。
+- **`CHECK (spot_buy > 0 AND spot_sell > 0)`**
+- 歷史績效一律取當日匯率；查無當日（假日）時取前一個有值的日期。**這是查詢端的責任 —— 絕不可在寫入時補列**（補了就無法區分「有掛牌且與昨天同價」與「沒開門」）。
+
+> **[#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 修訂**：原本只有單一 `rate` 欄，未定義口徑。
+> - **口徑定為即期中價**。用途是**評價**不是換匯，買賣價差是交易成本不該計入；取單邊價的偏誤施加在**每一個評價日**上不會抵銷。取「即期」不取「現金」是因為現金牌價含鈔券運送保管成本（實測價差為即期的 **6.7 倍**）。**誤取現金買入 = 對每個歷史評價日打 98.76 折。**
+> - **保留四個原始牌價、`rate` 改為 generated column**：`rate` 是推導值，只存它就無法事後換口徑或驗證。表僅五千列量級，欄位成本可忽略。
+> - **`CHECK` 是必要的不是防禦性冗餘**：FinMind `TaiwanExchangeRate` 用 **`-1.0` 當缺值哨兵**（實測 22 列），且**分欄出現**（2010-12-30 是 `cash` 為 −1、2006-01-02 與 2012-01-02 是 `spot` 為 −1）。負匯率會讓外幣部位市值翻負且不報錯。`CHECK` 下在原始欄位上，在哨兵進表那一刻擋掉。
+> - 來源：FinMind `TaiwanExchangeRate`，實測即台銀牌告，一次請求取回 2006-01-02 起 5,122 列。詳見 [`performance.md`](./performance.md) §2.3 與 [`../research/tw-benchmark-and-fx-sources.md`](../research/tw-benchmark-and-fx-sources.md) §C。
+
+### `benchmark_series`
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `benchmark_code` | `text` | `TAIEX_TR` = 發行量加權股價**報酬**指數（含息） |
+| `trade_date` | `date` | |
+| `index_value` | `numeric(20,8)` | |
+| `source` | `text` | |
+
+- PK `(benchmark_code, trade_date)`
+- **[#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 新增。** 它同時是**台股交易日曆**的來源（[`performance.md`](./performance.md) §2.2 規定日曆不可從自己持有的標的推導 —— 停止買賣期間 `daily_close` 沒有列，若持股集中在該檔，那幾天會整個從日曆消失且圖看起來完全正常）。
+- ⚠️ **不把指數塞進 `daily_close`。** 那樣做的話，**所有掃 `daily_close` 算持股市值的查詢從此都必須記得排除指數列** —— 與 [#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 拒絕 `transaction.status`、[#10](https://github.com/NTUyu016/stock-analytic-platform/issues/10) 對 `user_id` 的警告是同一個形狀。另立表讓 `daily_close` 維持不變量：**裡面每一列都是一支可持有標的的價格。**
+- 主來源為 TWSE `www.twse.com.tw/indicesReport/MFI94U?response=open_data`（**政府資料開放授權條款－第 1 版**），FinMind `TaiwanStockTotalReturnIndex` 為備援（實測 5,807 列**逐列完全相同**）。回溯上限 2003-01-02。
 
 ### `alert`
 | 欄位 | 型別 | 說明 |
