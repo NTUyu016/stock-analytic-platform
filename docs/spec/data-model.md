@@ -116,10 +116,14 @@
 - UNIQUE `(user_id, external_ref)` WHERE `external_ref IS NOT NULL` — **匯入的冪等性靠它**（[#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19)）
 - `external_ref` 的內容是 `(券商, 成交日, 委託書號)` 的組合。**鍵裡必須有成交日** —— 委託書號在單日內唯一是確定的，跨日全域唯一則是未證實的假設（台股委託書號傳統上 5 碼且逐日回收）。加日期成本為零，賭錯的代價是靜默吃掉一筆真交易。詳見 [`transaction-input.md`](./transaction-input.md) §6。
 - 各類型的欄位語意：
-  - `BUY` / `SELL`：`quantity` + `price` + `fee` + `tax`
-  - `CASH_DIVIDEND`：只有 `cash_amount`，不改股數，**降低成本基礎**
+  - `BUY` / `SELL`：`quantity` + `price` + `fee` + `tax`（此處 `tax` 為證交稅）
+  - `CASH_DIVIDEND`：`cash_amount`（宣告**總額**）+ `tax`（配息當下扣掉的**補充保費／就源扣繳**）。不改股數，**不改成本基礎**。實收淨額 = `cash_amount` − `tax`
   - `STOCK_DIVIDEND`：只有 `quantity`，總成本不變 → 均價被稀釋
   - `ADJUSTMENT`：`quantity` 與 `cash_amount` 可正可負，`note` 必填
+
+> **[#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 修訂**：`CASH_DIVIDEND` 原記「**降低成本基礎**」，改為**不改成本基礎**、獨立累計為 Dividend Income。
+> 決定性理由不是「跟券商對得上」（那只是好處），而是**沖減成本會靜默翻轉報酬率的正負號** —— 長期持有高殖利率標的時累計股利可超過原始成本，使成本基礎降到零以下，而報酬率 `(市值 − 成本)/成本` 的分母一旦為負，正負號整個翻過來且不報錯。詳見 [`performance.md`](./performance.md) §3。
+> ⚠️ **`tax` 欄在不同 `type` 下語意不同**（證交稅／補充保費），這沿用本表 `quantity`、`cash_amount` 既有的分型別語意做法，但必須寫進欄位註解，否則日後會有人問「為什麼股利有證交稅」。
 
 > 費用與稅的實際計算規則待 [issue #6](https://github.com/NTUyu016/stock-analytic-platform/issues/6) 的研究結論；本表只保證欄位存在。
 
@@ -239,7 +243,7 @@
 | `position` | Position 是推導值。存了就會與 Transaction 不一致，且改一筆舊交易後歷史就錯了。 |
 | `lot`（批次） | 成本基礎採加權平均，不需追蹤個別批次。日後要改 FIFO 時，從 Transaction 重建即可，不需要現在就存。 |
 | `quote`（即時報價） | 具時效性，落地無價值且量大。活在記憶體與快取中。 |
-| `portfolio_snapshot` | 歷史資產曲線由 Transaction + `daily_close` + `exchange_rate` 重算。存快照就無法在修正舊交易後自動修正歷史。效能待 [issue #16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 評估，若真的需要則以**快取**而非事實來源的形式加入。 |
+| `portfolio_snapshot` | 歷史資產曲線由 Transaction + `daily_close` + `exchange_rate` 重算。存快照就無法在修正舊交易後自動修正歷史。**[#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 已評估完畢：v1 確定不加，連快取形式都不加。** 兩個理由——（1）拖曳選取區間操作的是瀏覽器裡已載入的序列，**不打後端**，`dashboard-ui.md` §7 對 60fps 的顧慮不成立；（2）資料量本來就小。解除條件見 [`performance.md`](./performance.md) §1.4。 |
 
 ## 已知待補
 
@@ -247,4 +251,4 @@
 - ~~費用與稅欄位的計算規則~~ → **已由 [#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 補齊**，見 [`transaction-input.md`](./transaction-input.md) §2（含元以下進位規則，由實際對帳單反推）
 - ~~`alert.condition` 的具體結構~~ → **已由 [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 補齊**，見 [`alerts.md`](./alerts.md)（改具名欄位、新增 `alert_state`、`notification` 補四欄、`daily_close` 擴充為日 OHLCV）
 - 個股分析結果要不要落地快取 → [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14)
-- 績效演算法（TWR / XIRR）需要哪些額外欄位 → [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16)
+- ~~績效演算法（TWR / XIRR）需要哪些額外欄位~~ → **已由 [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 答畢：一欄都不用加。** TWR 與 XIRR 的輸入全部來自既有的 `transaction` + `daily_close` + `exchange_rate`。唯一的變動是 `CASH_DIVIDEND` 的 `tax` 欄語意（見上）與 `portfolio_snapshot` 的確定不做。詳見 [`performance.md`](./performance.md)

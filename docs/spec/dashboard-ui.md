@@ -98,6 +98,9 @@
 - **不放「佔比」** —— 資產配置面板已在講同一件事
 - 數字欄一律 `tabular-nums` 並右對齊
 
+> **[#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 修訂**：本表的「報酬率」是**簡單報酬率且不含股利**，因此與券商 App 的數字對得上。**必須在欄位標題或說明處標示「不含股利」**。
+> 含股利的版本（「含股利總報酬」與「已領股利」兩個**絕對金額**）放在**展開列**，不放在列上 —— 同一張表出現兩個都叫「報酬率」的欄位，是製造誤讀的最短路徑。詳見 [`performance.md`](./performance.md) §4.1。
+
 ---
 
 ## 6. 交易明細：依市場拆表
@@ -131,10 +134,13 @@
 
 - 區間內用方向色描邊並填色，**區間外壓淡至 32%**
 - 兩端虛線界線 + 端點圓點
-- 單擊或 `Esc` 取消；切換期間（1M/3M/6M/1Y）亦清除
+- 單擊或 `Esc` 取消；切換期間（1M/3M/6M/1Y/**全部**）亦清除
 - 未選取時為十字準星 + 單日 tooltip；選取後準星讓位，避免兩套游標打架
 
-⚠️ **這個互動對後端有實質需求，且是 [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 的直接輸入**：任意兩點之間的報酬率必須算得出來，代表**每日總資產必須逐日可得，且查詢必須夠快以支撐 60fps 的拖曳**。這使得「快照 vs 每次重算」的成本差距遠大於原先估計。
+~~⚠️ **這個互動對後端有實質需求**：查詢必須夠快以支撐 60fps 的拖曳，這使得「快照 vs 每次重算」的成本差距遠大於原先估計。~~
+
+> **[#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 撤回上述判斷。** 拖曳操作的是**瀏覽器裡已經載入的那條序列**，完全不打後端 —— 後端只在切換期間時回一次完整序列（1 年約 244 個點，個位數 KB）。**60fps 是前端的事，與資料庫無關。**
+> 這條顧慮曾是「該不該建 `portfolio_snapshot` 快取」最主要的推力，撤回後 #16 定案為**每次重算、不建快取**。期間選項另補上「全部」（曲線起點為最早一筆交易日）。詳見 [`performance.md`](./performance.md) §1.3。
 
 ---
 
@@ -174,4 +180,4 @@
 | ~~推播節流頻率~~ → **已定為 800ms 全域節拍批次送**（見 [`realtime-quotes.md`](./realtime-quotes.md) §6）。§4 的 800ms 動畫直接成為節流節拍，整張持股表每 800ms 同步刷一次，對齊 §9 要求的單一 `requestAnimationFrame` 合併點 | [#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) |
 | 個股分析頁的呈現形式與五級建議 | [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) |
 | 警示卡片要顯示哪些規則類型 | [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) |
-| 每日總資產如何取得（快照 vs 重算）、報酬率演算法 | [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) |
+| ~~每日總資產如何取得（快照 vs 重算）、報酬率演算法~~ → **已定為每次重算、不建快取**；報酬率分四個指標各有其位（見 [`performance.md`](./performance.md)）。連帶修訂本文 §5 與 §7 | [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) |
