@@ -432,9 +432,15 @@ conflation 只有在「**每則報價都是完整的當前狀態**」時才是�
 
 > **統一 Quote 型別的量一律為「當日累積成交量」，不得使用單筆量。** provider 原始欄位差異由 adapter 吸收（§2）。
 
-### 交給 #15 的事實
+### ✅ 已由 #15 答畢：警示評估分岔在 conflation **之前**
 
-worker 端在 conflation **之前**看得到完整未節流的價格流，`api` 只看得到取樣後的。[#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 待決事項 3 要選「警示在串流管線裡即時比對還是獨立排程」時，這是關鍵差異——**在 worker 評估看得到瞬間穿越門檻的價格，在 `api` 評估則會漏掉。**
+worker 端在 conflation **之前**看得到完整未節流的價格流，`api` 只看得到取樣後的。
+
+[#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 已據此定案：**盤中警示由 `quote-worker` 在 conflation 之前逐筆評估**，畫面推播照舊走 800ms 節拍，兩條路在 worker 內分岔。
+
+> ⚠️ **這條不是效能取捨，是必要條件。** #15 選了 `trades` 頻道以換取逐筆精度（額度只夠一個頻道）。若警示掛在 conflation 之後，看到的就只有每 800ms 的當下價格——那正是 `aggregates` 的行為。**等於付了 `trades` 的代價、得到 `aggregates` 的結果，而且不會有任何錯誤訊息。**
+
+詳見 [`alerts.md`](./alerts.md) §0。
 
 ---
 
@@ -596,9 +602,11 @@ api      ◀──NOTIFY 'quote_updates'────┘  （回送記憶體中�
 | 1 | 同時只能訂閱 **5 檔** | Fugle 免費層額度。**選 Fugle 純粹因為 Shioaji 需要開戶與強制下單測試（數個工作天），不是技術判斷** | [#8](https://github.com/NTUyu016/stock-analytic-platform/issues/8) 開通 Shioaji | 只改 `ProviderCapabilities` 的設定值（→200）。**若此時需要改動核心邏輯，代表 §2 的規則沒被遵守** |
 | 2 | 即時警示**限持股標的** | 額度剛好被持股用完（§5） | 同上 | 解除 [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 的標的限制 |
 | 3 | 本機**不接真行情**，預設 fake provider | Fugle 免費層 **1 連線且是帳號級**（§1） | Shioaji 給 5 連線 | 可放寬本機直連；但 fake provider 仍應保留（契約測試與額度測試需要） |
-| 4 | 開頁降級路徑走 **yfinance** 而非 provider 快照 API | Fugle 免費層「快照」欄位為不支援（[#2 §2.1](../research/tw-realtime-quote-sources.md)） | 同 #1 | 讀 `supports_snapshot` 即自動可用，**不需改程式** |
+| 4 | ~~開頁降級路徑走 **yfinance** 而非 provider 快照 API~~ **此條已作廢** | ~~Fugle 免費層「快照」欄位為不支援~~ —— **前提經查證為錯**（見檔首事實更正 #1）：`GET /intraday/quote/{symbol}` 免費層可用，60 次/分鐘 | **已解除** | §7 第 3 層改走 Fugle 單一標的報價，**不再需要 yfinance 降級層**。`supports_snapshot` 須拆成 `supports_symbol_quote` / `supports_market_snapshot` |
 | 5 | 不涵蓋**盤後零股**時段 | Fugle 免費層零股支援未查證，不押注（§8） | 轉 Shioaji（有 `intraday_odd`）**且**確認使用者確有零股即時需求 | 延長 worker 開機至 14:35，成本 +22% |
 | 6 | `NOTIFY` payload 單則上限 **8000 bytes** | Postgres 限制。5 檔遠低於此，故 v1 不處理 | 訂閱數增至 200 檔後會撞到 | 批次改為分段送出 |
+| 7 | 只訂 `trades`，**畫面無最佳五檔即時推播** | 5 個額度 = 5 個 (標的×頻道) 配對，5 檔持股只夠一個頻道。[#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 選逐筆精度優先 | 同 #1（Shioaji 額度單位是「檔」，`trades` 與 `books` 可同時訂） | 加訂 `books` 頻道，撤掉 #8 的 REST 輪詢 |
+| 8 | 需要五檔時走 REST `/intraday/quote/{symbol}` 輪詢，**5 秒粒度** | 同 #7。免費層 60 次/分鐘 ÷ 5 檔 = 每 5 秒一輪 | 同 #7 | 同 #7 |
 
 **同類條目散落在其他文件中**（`quote-worker` 可選、v1 只支援現股、開放註冊降級為驗收標準……）。是否集中成一份 repo 層級清冊，由 [#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 決定文件形狀時處理。
 
