@@ -102,8 +102,8 @@ Instrument 在盤中的最新成交價與相關即時欄位。**具時效性且�
 _Avoid_: Price, Tick, 即時價
 
 **Daily Close（每日收盤價）**：
-Instrument 在某個交易日的收盤價，落地儲存。歷史資產曲線與績效計算的唯一價格來源。
-_Avoid_: Close price, EOD, 歷史價
+Instrument 在某個交易日的**日 OHLCV**（開高低收與成交量），落地儲存。歷史資產曲線與績效計算的唯一價格來源，也是追蹤停損峰值與成交量異常的唯一歷史來源。名稱雖為「收盤價」，內容不只收盤價。
+_Avoid_: Close price, EOD, 歷史價, OHLC
 
 **Exchange Rate（匯率）**：
 某一日某個幣別對台幣的換算率，落地儲存。歷史績效一律使用**當日**匯率，不使用當前匯率回溯換算。
@@ -122,3 +122,11 @@ _Avoid_: Notification, Trigger, 提醒
 **Notification（通知）**：
 Alert 觸發後實際送出的一則訊息。一個 Alert 可對應多則 Notification（重複觸發）與多個送達管道。
 _Avoid_: Alert, Message, 推播
+
+**Armed（武裝）**：
+Alert 目前處於「條件一旦成立就會觸發」的狀態。觸發後轉為解除，直到價格回到門檻另一側（含緩衝）才重新武裝。武裝與否是 Alert 的**運行狀態**，不是使用者設定 —— 使用者設的是 `is_enabled`。
+_Avoid_: Active, Enabled, 啟用中, 監控中
+
+**Peak（峰值）**：
+追蹤停損所記的「持有以來最高價」，自建倉日起算、清倉即重置、除權息日按參考價比率下調。它是**可重建的快取**，不是事實 —— 隨時可從 Transaction 與 Daily Close 重算。
+_Avoid_: High, Max, 最高點, 歷史高

@@ -128,13 +128,22 @@
 |---|---|---|
 | `instrument_id` | `bigint` FK | |
 | `trade_date` | `date` | |
+| `open` | `numeric(20,8)` | |
+| `high` | `numeric(20,8)` | 追蹤停損的峰值回補（[#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15)） |
+| `low` | `numeric(20,8)` | |
 | `close` | `numeric(20,8)` | |
 | `prev_close` | `numeric(20,8)` | 算當日漲跌幅用，避免回查前一交易日 |
+| `volume` | `bigint` | **單位：股**。成交量異常與量能比用（[#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15)、[#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14)） |
 | `source` | `text` | 資料來源，供日後校正 |
 
 - PK `(instrument_id, trade_date)`
 - 新增標的時回補歷史，之後每日盤後排程追一筆。
 - 量級：10 支標的 × 10 年 ≈ 2.5 萬列。
+
+> **[#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 修訂**：表名維持 `daily_close`，但它現在裝的是**日 OHLCV**。
+> - **回補範圍**：每檔回補到**該檔最早的建倉日**，非固定年數 —— 追蹤停損的直接要求。
+> - **停止買賣日不補列、不寫 `volume = 0`**（減資期間 FinMind 直接沒有那些列；補成 0 會壓低均量約 12%，復牌後產生假爆量）。連帶：「六十日均量」一律指**最近 60 筆列**，不是 60 個日曆交易日。
+> - **不可走 yfinance**：台股成交量實測 22.3% 的交易日誤差 ≥100 倍。唯一乾淨來源是 FinMind `TaiwanStockPrice`，詳見 [`alerts.md`](./alerts.md) §2.4。
 
 ### `exchange_rate`
 | 欄位 | 型別 | 說明 |
@@ -150,23 +159,46 @@
 | 欄位 | 型別 | 說明 |
 |---|---|---|
 | `id` | `bigserial` PK | |
-| `user_id` | `bigint` FK | |
-| `instrument_id` | `bigint` FK | |
-| `condition` | `jsonb` | 條件內容 |
-| `is_enabled` | `boolean` | |
+| `user_id` | `bigint` FK NOT NULL | |
+| `instrument_id` | `bigint` FK NOT NULL | |
+| `rule_type` | `text` NOT NULL | 六種具名類型之一，`CHECK` 列舉 |
+| `threshold` | `numeric(20,8)` NOT NULL | 語意隨 `rule_type` 而異 |
+| `is_enabled` | `boolean` NOT NULL DEFAULT true | |
+| `is_deleted` | `boolean` NOT NULL DEFAULT false | 軟刪除，沿用 `instrument.is_active` 先例 |
+| `created_at` | `timestamptz` NOT NULL | |
 
-> 條件的具體模型、去重與冷卻策略待 [issue #15](https://github.com/NTUyu016/stock-analytic-platform/issues/15)。此處先以 `jsonb` 佔位，避免現在就把規則形狀鎖死。
+> **[#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 修訂**：原 `condition jsonb` 佔位欄位由 `rule_type` + `threshold` 取代。
+> 決定性理由不是 `jsonb` 掉精度（那經查證是錯的，官方存成 `numeric`），而是 **`CHECK` 約束對 NULL 放行** —— 用 `CHECK` 保護 `jsonb` 這件事本身就是一個漏寫不報錯的活動。詳見 [`alerts.md`](./alerts.md) §2.1。
+
+### `alert_state`
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `alert_id` | `bigint` PK FK | 1:1 |
+| `is_armed` | `boolean` NOT NULL DEFAULT true | 武裝中 / 已觸發等回歸 |
+| `last_triggered_at` | `timestamptz` NULL | |
+| `peak_price` | `numeric(20,8)` NULL | 僅 `TRAILING_STOP` |
+| `peak_since` | `date` NULL | 僅 `TRAILING_STOP`，峰值起算日（建倉日） |
+| `updated_at` | `timestamptz` NOT NULL | |
+
+> **[#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 新增。** 與 `alert` 分表的理由是**可重建性不同**：`alert` 是使用者打的字，毀了就沒了；`alert_state` 全部可以從 `transaction` + `daily_close` + 當前 Quote 重算。分表後「狀態疑似錯亂」的修復是一次安全的整表重建，而非在使用者資料上動刀。
 
 ### `notification`
 | 欄位 | 型別 | 說明 |
 |---|---|---|
 | `id` | `bigserial` PK | |
-| `alert_id` | `bigint` FK | |
-| `triggered_at` | `timestamptz` | |
-| `channel` | `text` | 送達管道 |
-| `payload` | `jsonb` | |
+| `user_id` | `bigint` FK NOT NULL | **新增**，核心原則 5 |
+| `alert_id` | `bigint` FK NULL | 盤後總結不對應單一 alert，故可空 |
+| `triggered_at` | `timestamptz` NOT NULL | |
+| `channel` | `text` NOT NULL | 送達管道 |
+| `payload` | `jsonb` NOT NULL | 站內呈現用，**可含金額**（Discord 通知不可） |
+| `status` | `text` NOT NULL | `PENDING` / `SENT` / `FAILED` / `ABANDONED` |
+| `attempts` | `smallint` NOT NULL DEFAULT 0 | |
+| `delivered_at` | `timestamptz` NULL | |
+| `last_error` | `text` NULL | **落地前必須遮蔽 webhook URL** |
 
-> 管道選型見 [issue #7](https://github.com/NTUyu016/stock-analytic-platform/issues/7) 的研究結論。
+> 管道選型見 [issue #7](https://github.com/NTUyu016/stock-analytic-platform/issues/7) 的研究結論，v1 定為 **Discord**（[#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15)）。
+> 投遞狀態欄位與 [#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 拒絕 `transaction.status` **不衝突**：`transaction` 是事實來源，加 `status` 會讓所有既有查詢必須記得過濾；`notification` 記的就是一次投遞嘗試，狀態是它的本質屬性。
+> **不設保留期限** —— 5–10 條規則一年也就幾百列。
 
 ### `pending_action`
 | 欄位 | 型別 | 說明 |
@@ -213,6 +245,6 @@
 
 - 認證流程的完整規格（provider 接法、逃生階梯、cookie 屬性） → [`auth.md`](./auth.md)
 - ~~費用與稅欄位的計算規則~~ → **已由 [#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 補齊**，見 [`transaction-input.md`](./transaction-input.md) §2（含元以下進位規則，由實際對帳單反推）
-- `alert.condition` 的具體結構 → [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15)
+- ~~`alert.condition` 的具體結構~~ → **已由 [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 補齊**，見 [`alerts.md`](./alerts.md)（改具名欄位、新增 `alert_state`、`notification` 補四欄、`daily_close` 擴充為日 OHLCV）
 - 個股分析結果要不要落地快取 → [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14)
 - 績效演算法（TWR / XIRR）需要哪些額外欄位 → [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16)
