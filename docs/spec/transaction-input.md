@@ -411,7 +411,7 @@ v1 的交易輸入被視為完成，當且僅當：
 
 ## 13. 已知待補
 
-- **交割帳戶現金流**：本文只處理標的部位，不追蹤交割帳戶餘額。日後若要做現金報酬率或 XIRR，需要它 → 與 [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 一併評估
+- ~~**交割帳戶現金流**：日後若要做現金報酬率或 XIRR，需要它~~ → **[#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 已評估：XIRR 不需要它，v1 確定不追蹤。** 理由是定義問題不是省略 —— XIRR 衡量「投入到標的裡的錢」的報酬，閒置在交割帳戶的現金不是投資組合的一部分，把它算進分母會變成在衡量另一個問題（現金管理效率）。每一筆買賣與股利本身就是「錢進出投資組合」的完整紀錄。詳見 [`performance.md`](./performance.md) §5.4
 - **美股交易的匯入**：本文規範的是台股。美股複委託對帳單格式未取得，中性格式可暫時承接
 - **券商 API 自動同步**：見 [#1](https://github.com/NTUyu016/stock-analytic-platform/issues/1) 的 Not yet specified。本文的對帳機制屆時會被它取代大半
 - **費率生效區間的維護方式**：誰在什麼時候更新費率表、怎麼發現券商調整了折讓 → [#6](https://github.com/NTUyu016/stock-analytic-platform/issues/6) §8 的落日條款追蹤是同一個問題

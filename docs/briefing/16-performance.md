@@ -3,6 +3,20 @@
 > **本文不做決策。** 每個待決事項只盤點事實、選項與代價，供 grilling session 使用。
 > 產出日期：2026-08-04。所有本機實測皆為丟棄式腳本，不進 repo。
 
+> ## ✅ 2026-08-07：#16 已定案，本文已消化完畢
+>
+> **決策一律以 [`../spec/performance.md`](../spec/performance.md) 為準。** 本文保留作為證據來源（§1.2 的 PostgreSQL 實測數字被規格 §1.5 直接引用），但其選項盤點已無決策效力。
+>
+> 定案時對本文的三處更正／補強：
+>
+> | 本文 | 後續 |
+> |---|---|
+> | §1.4 **R2**（跨市場日曆無規格） | 已答：[`performance.md`](../spec/performance.md) §2.2 採**交易日聯集**。另由原型量化：用等值 join 會靜默吃掉 **1.6% 的交易**，且污染永久 |
+> | §1.4 **R3**（`traded_on` 落在非交易日如何對齊） | 已答：§8.1 **部位推導一律用 `traded_on <= D` 不等式聚合，不得 join 日曆**；TWR 的現金流往後對齊到下一個曲線日 |
+| §5.2 三項結論（報酬指數歷史只能靠 FinMind、0050 費率、臺灣50報酬指數未查證） | **已被 [`../research/tw-benchmark-and-fx-sources.md`](../research/tw-benchmark-and-fx-sources.md) 更正**，見該文 §A.2 / §B.4 / §B.5 |
+>
+> §1.4 的 **R1／R5**（正式環境效能、scale-to-zero 冷啟動）**仍未解**，已移交 [#17](https://github.com/NTUyu016/stock-analytic-platform/issues/17)。
+
 ---
 
 ## 0. 實測環境與可信度聲明

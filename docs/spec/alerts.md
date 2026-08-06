@@ -274,6 +274,16 @@ FinMind 與 TWSE／TPEx 的價格**都是原始值，不做任何還原**。
 
 此調整掛在盤後排程，與 [#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 產生除權息 `pending_action` 的同一個事件上 —— **同一個事件、兩個消費者，不是兩次偵測**。
 
+> ### ⚠️ 2026-08-07 由 [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 補上的缺口：**股票分割走不到這條路徑**
+>
+> 上述做法的觸發源是 `TaiwanStockDividendResult` 的 `reference_price`，而**分割不是除權息** —— 它在 `TaiwanStockSplitPrice`，是另一個 dataset。
+>
+> **實例**：0050 於 **2025-06-18 一拆四**（分割前參考價 188.65 → 分割後 47.16）。峰值會停在 188.65，而股價已是 47.57 —— **本節開頭列出的三個後果會原封不動重演一次，包括第 3 點「長期黏在已觸發且不報錯」。**
+>
+> 這與除權息**完全同形，只是換了一個觸發源**。ETF 分割不是罕見事件（0050 是 2025 年台股 ETF 分割潮的一員，多檔跟進）。
+>
+> **本規格暫不修改**：分割的型別與調整規則另立票處理，見 [`performance.md`](./performance.md) §8.6 與 §11。此處先標記缺口，避免實作時照著本節寫完就以為蓋全了。
+
 ### ⚠️ 硬性規則：峰值可重建，且必須有重建路徑
 
 `peak_price` 是快取不是事實。實作必須提供「從 `transaction` + `daily_close` 重算某條規則峰值」的操作，並在 worker 啟動時對 `peak_since` 為 NULL 者自動執行。
