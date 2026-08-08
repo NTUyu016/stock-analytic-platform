@@ -208,7 +208,7 @@ v1 預期的路徑是**先用 Fugle 免費層（5 檔訂閱、零開戶、NT$0�
 | `analyze_momentum`、`calculate_rsi`、`analyze_historical_patterns`、`analyze_earnings_surprise`、`analyze_fundamentals` 骨架 | ≈400 | **可沿用**（#4 判定「原封不動」的 3 維） |
 | 市場情緒區塊（CNN Fear & Greed、put/call、VIX） | ≈450 | 全數重建——全是美股專屬 |
 | 類股 ETF 對照、地緣風險圖譜 | ≈300 | 換來源（→ 證交所 `MI_INDEX` 37 檔產業類指數）＋**符號反轉** |
-| `synthesize_signal` | ≈300 | 評分權重全部重新取捨（#14） |
+| `synthesize_signal` | ≈300 | 評分權重全部重新取捨，**已由 #14 定案為六維加權合成**：廢除 `confidence`（改記 Coverage）、新增下修原因記錄、新增各維 `as_of` 時間戳保留，見 [`analysis-dimensions.md`](./analysis-dimensions.md) |
 | `main()` CLI ＋ `format_output_*` ＋ portfolio summary | ≈440 | 作廢（CLI → HTTP、文字 → JSON） |
 | crypto 相關 | ≈100 | v1 不定（#1 列在 Not yet specified） |
 | `portfolio.py` 全檔 | 548 | **全數作廢**——#9 已定 Transaction 為唯一事實來源，JSON 檔儲存模型整個被取代 |
@@ -270,7 +270,7 @@ ECharts 是唯一能一個庫全包的候選，代價是即時更新只能走 `s
 | 成本基礎、已實現/未實現損益、報酬率（TWR/IRR）、交易成本與稅費 | **嚴格 TDD**（先寫測試） | 純函式零 I/O，測起來最便宜；算錯錢最貴 |
 | 外部資料源 adapter（yfinance / Shioaji / TWSE OpenAPI） | **契約測試**（錄真實回應當 fixture） | 這些來源會靜默壞掉 |
 | 行情重連退避邏輯 | 用假時鐘測退避序列 | 唯一「寫錯會導致外部帳號被鎖」的邏輯 |
-| 分析維度評分、API 端點、前端 | **v1 不寫** | #14 未定，現在寫的 assertion 多半會被推翻重寫 |
+| 分析維度評分、API 端點、前端 | **v1 不寫** | #14 已定案（見 [`analysis-dimensions.md`](./analysis-dimensions.md)），但維度取捨不等於門檻穩定——v1 沒有回測能力、四個評等切點靠主觀設定，此時寫死的 assertion 意義不大，等有真實使用數據再議 |
 
 ### 為什麼錢的計算值得先寫測試
 

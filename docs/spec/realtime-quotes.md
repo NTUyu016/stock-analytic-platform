@@ -629,4 +629,4 @@ api      ◀──NOTIFY 'quote_updates'────┘  （回送記憶體中�
 | 警示在 worker（未節流）還是 `api`（已取樣）評估；即時警示限持股標的 | [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) |
 | `daily_close` 盤後排程跑在哪裡（`api` 會 scale-to-zero）；worker 開關機排程的實作；資料庫是否可自動休眠 | [#17](https://github.com/NTUyu016/stock-analytic-platform/issues/17) |
 | 「暫時性妥協」條目是否集中成 repo 層級清冊 | [#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) |
-| 個股分析頁是否需要即時報價（目前額度不支援） | [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) |
+| ~~個股分析頁是否需要即時報價（目前額度不支援）~~ | **已由 [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) 答畢：不需要。**六個分析維度全部是日頻以下更新，見 [`analysis-dimensions.md`](./analysis-dimensions.md) §0 |

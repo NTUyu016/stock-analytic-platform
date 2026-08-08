@@ -275,5 +275,5 @@
 - 認證流程的完整規格（provider 接法、逃生階梯、cookie 屬性） → [`auth.md`](./auth.md)
 - ~~費用與稅欄位的計算規則~~ → **已由 [#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 補齊**，見 [`transaction-input.md`](./transaction-input.md) §2（含元以下進位規則，由實際對帳單反推）
 - ~~`alert.condition` 的具體結構~~ → **已由 [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 補齊**，見 [`alerts.md`](./alerts.md)（改具名欄位、新增 `alert_state`、`notification` 補四欄、`daily_close` 擴充為日 OHLCV）
-- 個股分析結果要不要落地快取 → [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14)
+- ~~個股分析結果要不要落地快取~~ → **已由 [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) 答畢：v1 不落地快取，每次開頁即時算。** 不需要新增資料表，見 [`analysis-dimensions.md`](./analysis-dimensions.md) §4
 - ~~績效演算法（TWR / XIRR）需要哪些額外欄位~~ → **已由 [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 答畢：一欄都不用加。** TWR 與 XIRR 的輸入全部來自既有的 `transaction` + `daily_close` + `exchange_rate`。唯一的變動是 `CASH_DIVIDEND` 的 `tax` 欄語意（見上）與 `portfolio_snapshot` 的確定不做。詳見 [`performance.md`](./performance.md)

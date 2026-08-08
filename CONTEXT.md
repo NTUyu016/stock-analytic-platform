@@ -159,3 +159,21 @@ _Avoid_: Active, Enabled, 啟用中, 監控中
 **Peak（峰值）**：
 追蹤停損所記的「持有以來最高價」，自建倉日起算、清倉即重置、除權息日按參考價比率下調。它是**可重建的快取**，不是事實 —— 隨時可從 Transaction 與 Daily Close 重算。
 _Avoid_: High, Max, 最高點, 歷史高
+
+### 個股分析
+
+**Analysis Dimension（分析維度）**：
+個股分析頁裡，針對某個面向（如財報意外、基本面）產生的一組分數與說明文字，是 Analysis Result 的組成單位。v1 有六個：財報意外、基本面、動能、分析師評等、大盤環境、產業比較（[#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14)）。
+_Avoid_: Signal, Factor, 指標（單講「指標」時容易與券商慣用的技術指標混淆）
+
+**Rating（評等）**：
+一次分析結果彙總後呈現的五級分類：strong buy / buy / hold / sell / strong sell。與 yfinance 提供的「分析師共識評等」字面相同但**來源不同**——畫面上用不同措辭區分兩者，本站中文五級固定為「**大幅偏多／偏多／中性／偏空／大幅偏空**」，分析師共識維持原文英文，避免使用者誤讀成同一件事。
+_Avoid_: Recommendation, Grade, 建議, 級距（同一件事不要兩種講法）；不要用 Score／「分數」指稱 Rating 本身——「分數」是各 Analysis Dimension 得分的標準用詞（見 Analysis Result），Rating 是彙總後的五級分類，兩者不同層級
+
+**Analysis Result（分析結果）**：
+一次個股分析的完整輸出：各 Analysis Dimension 的分數與說明、彙總後的 Rating、下修原因（若有）。**每一維各自帶時間戳**（哪個時間點的資料算出來的），不是只有一個籠統的整包時間。v1 每次開頁即時算，**不落地快取**——具時效性，不是事實來源。
+_Avoid_: Signal（舊 stock-analysis skill 用 `Signal` dataclass 同時裝 `recommendation`／`confidence`／`final_score` 三個欄位，本專案刻意把這些概念拆開，不要把同樣的混用搬進來）
+
+**Coverage（維度覆蓋率）**：
+一次 Analysis Result 實際用上了幾個 Analysis Dimension（滿分為 Analysis Dimension 總數）。取代舊 skill 的 `confidence`——舊 skill 的 `confidence` 其實就是最終分數的絕對值，跟 Rating 是同一個數字重複呈現兩次，本專案不用這個詞。若 Coverage 過低，直接不給 Rating 並說明缺什麼資料，不硬湊結論。
+_Avoid_: Confidence, 信心度
