@@ -1,5 +1,26 @@
 # 決策簡報：issue #17「部署、環境與成本上限」
 
+> ## ⚠️ 2026-08-09 事實更正（本文部分內容已被推翻）
+>
+> [`docs/research/deployment-facts-2026-08-09.md`](../research/deployment-facts-2026-08-09.md) 對本文標為「未能查證」的項目做了一次向官方第一手來源的複查，**推翻或修正了本文六處敘述**。以下為摘要，逐條細節見該文 §9：
+>
+> | # | 本文位置 | 已被推翻／修正的內容 |
+> |---|---|---|
+> | 1 | §7.1、§7.2 | **「Cloudflare 免費子網域」這個東西不存在。** Cloudflare Free plan 提供的是「已擁有網域的免費 DNS 託管 + Universal SSL」，網域仍須付費。**DuckDNS 是唯一真免費的子網域選項**，不是兩個 |
+> | 2 | §1.2 選項 D、§1.1(f) | Render Free 的 750 小時風險寫錯了。官方明文「**spun-down services don't consume Free instance hours**」，對一台 scale-to-zero 的服務，這條限制的形狀與本文描述的「近乎必然撞頂」完全不同 |
+> | 3 | §4.2 Supabase 那一列 | IPv4 的框架寫反了。**Supavisor 兩種模式（含 session mode, 5432）官方明文「Always uses an IPv4 address」且免費**，付費牆只擋 direct connection。真正的未知從頭到尾只有一個：那條免費路支不支援 `LISTEN/NOTIFY`（兩次查證仍為「官方未載明」） |
+> | 4 | §2.2 選項二 | 「依平台原生機制設定 spending cap」**在 Fly 上不存在**——官方明文「We don't support billing alerts (yet)」。**四家沒有任何一家提供帳號總支出硬上限** |
+> | 5 | §1.3、§2.3、§4.3、§8.3 的多項「未能查證」 | 其中六項已查到：Fly nrt 官方係數 **1.307692308**、Fly/Render 全部實價（與 #5 於 2026-08-01 的數字逐項吻合）、Neon Free compute 範圍 **0.25–2 CU** 與用罄行為（**整個 project 的 compute 被 suspend**，非降速）、Neon Free 還原窗 **僅 6 小時**、Render **確實有** suspend/resume REST API |
+> | 6 | §1.1(c) | 「Fly 停機不計費」有 **volume 例外**：「You'll be charged for volumes... including when an attached Machine is stopped」 |
+>
+> **另新增兩項既有文件完全未記載的風險**：GitHub Actions 對 **public repo 若 60 天無活動會自動停用 scheduled workflow**（本 repo 為 public，且不會產生任何失敗 run）；Neon Free 另有 **5 GB/月公網傳輸額度**，用罄後果與 CU-hours 相同。
+>
+> **方法面的教訓**：本文與 `scheduling-and-db-sleep.md` 都把 Fly 與 Render 的定價頁記成「JS 動態載入、抓不到」——**兩個頁面其實都是靜態的**（Fly 把所有區域的價目表預渲染後用 CSS `hidden` 藏起來，Render 是伺服器端渲染的 `<table>`）。那不是「查不到」，是抓取方式抓錯層。
+>
+> ## ✅ 本票已於 2026-08-09 定案，決策見 [`docs/spec/deployment.md`](../spec/deployment.md)
+>
+> **定案方向與本文九個待決事項的預設前提不同**：v1 不上雲，跑在使用者自己的電腦上。本文對 Fly／Render／Neon／Supabase 的盤點因此**降級為「v2 上雲時的遷移路徑材料」**，仍然有效，但不是 v1 的選型依據。
+
 > 產出日期：2026-08-08
 > 用途：**上桌前準備**。本文只盤點事實與選項，**不做任何決策**——決策由使用者在 grilling session 親自做。
 > 引用規則：所有事實附出處（檔案＋章節／issue 留言／第一手 URL）。查不到者一律標「**未能查證，需人工確認**」。
@@ -96,7 +117,7 @@
 | **A. Fly.io 全套**（`api` scale-to-zero + `worker` 只開盤中 + 外接 Neon Free） | 最省（≈NT$28/月） | **零內建排程失敗告警**（見待決 8）；原生排程精度不足以表達「09:00 Asia/Taipei」，需要一台額外的觸發器或常駐 Cron Manager——而「養一台常駐機器來跑排程」與「能中途停掉」的偏好直接衝突 | Scheduled Machine 一旦設定就不能再被 API 手動啟動，**日後想臨時手動觸發一次補跑會發現做不到**，屆時才發現這個互斥會是最糟的時機 |
 | **B. VPS（Vultr/Linode 東京）全自架** | 24/7 一切自理，無冷啟動、無 pooler 陷阱、排程可設 `Asia/Taipei` 時區 | 關機不省錢，**與「能中途停掉」的偏好正面衝突**；OS／DB 維運全部自理；US$5 ≈ NT$162/月，比 NT$100/月上限**超出 62%**（非「略超」） | 若日後想靠關機省錢，會發現這條路在 VPS 上**從一開始就不存在**——這是 VPS 這個選項本質上的天花板，不是配置問題 |
 | **C. Fly（運算）+ Render Cron Job（排程與告警）+ Neon Free** | 補上 Fly 缺的排程精度與失敗告警 | 三個供應商，故障排查要在三個 dashboard 之間切換；月費升到 ≈NT$56，仍在預算內 | 三供應商代表三份帳號管理、三份 secret 機制（見待決 5），複雜度是這個選項真正的隱藏成本 |
-| **D. Render 全包**（Free web + Cron Job + Neon Free） | 兩個供應商（與 A 並列最少）、**四家中唯一有內建排程失敗告警**（見待決 8）、月費 ≈NT$32（比 A 貴，但比 C 便宜） | **Free instance 每月僅 750 小時、無 SLA**；節點僅新加坡，對台灣延遲劣於東京 | 750 小時上限對「一台 24/7」而言毫無餘裕（一個月約 730 小時），若 `api` 意外被留在醒著狀態超過閾值會直接撞頂 |
+| **D. Render 全包**（Free web + Cron Job + Neon Free） | 兩個供應商（與 A 並列最少）、**四家中唯一有內建排程失敗告警**（見待決 8）、月費 ≈NT$32（比 A 貴，但比 C 便宜） | **Free instance 每月僅 750 小時、無 SLA**；節點僅新加坡，對台灣延遲劣於東京 | ~~750 小時上限對「一台 24/7」而言毫無餘裕（一個月約 730 小時），若 `api` 意外被留在醒著狀態超過閾值會直接撞頂~~ **⚠️ 2026-08-09 更正：這條寫錯了。** 官方明文「spun-down services don't consume Free instance hours」，`api` 走 scale-to-zero 時大部分時間根本不消耗額度。此外 **Cron Job 沒有 Free 檔位**（最低 Starter，且有 $1/月最低消），而 Free Postgres **無 PITR、無備份保留**且 30 天到期 |
 | **E. Railway 全包** | 標準 cron 語法（比 Fly 原生排程精確）；scale-to-zero 判準涵蓋 outbound 封包 | **沒有真免費層**（US$5/30 天為一次性試用額度，超出預算上限）；判斷「閒置」的準則是 outbound 封包而非 inbound request——若 `api` 的 DB 連線池留一條閒置連線，Railway **永遠不會判定它閒置**，scale-to-zero 會在沒有任何錯誤訊息的情況下失效，帳單誠實反映這件事 | 這個失效模式不會報錯，只會在月底看到帳單比預期高——與本專案反覆點名的「靜默出錯」是同一形狀 |
 
 ### 1.3 仍未查證的空白
@@ -122,7 +143,7 @@
 | 選項 | 內容 | 代價／風險 |
 |---|---|---|
 | **只設一個總金額上限（如 NT$100/月），超過靠人工發現後介入** | 最簡單，符合單人自用的維運量級 | 若沒有任何告警機制搭配（見待決 8），**超支要等到月底看帳單才會發現**，那時成本已經發生 |
-| **依平台原生機制設定 spending cap / billing alert** | 若平台有提供，可在接近上限時自動通知或攔停 | 本次查證主要聚焦在「經常性月費」的計算，**各平台是否提供硬性支出上限（而非只是事後 billing alert）尚未逐一查證** |
+| **依平台原生機制設定 spending cap / billing alert** | 若平台有提供，可在接近上限時自動通知或攔停 | ~~各平台是否提供硬性支出上限尚未逐一查證~~ **⚠️ 2026-08-09 已查證：四家沒有任何一家提供帳號總支出硬上限。** Fly 官方明文「**We don't support billing alerts (yet), so budget accordingly**」（連事後通知都沒有）；Render 的 spend limit 只管 build pipeline minutes；Neon 付費層的 spending limit 目前**只發信不攔停**（自動暫停標為 coming soon）；Supabase 的 Spend Cap 是 Pro 專屬。**免費層之所以是「硬上限」，是因為它結構上不產生帳單，不是因為有 cap 這個功能** |
 | **在 Caddy 層對掃描器流量做初步防禦**（如速率限制、只允許特定 method） | 直接處理「掃描器叫醒機器」這個成本的源頭 | 這已經是應用程式／基礎設施層的實作細節，**是否屬於本票範圍、還是留給實作階段自行決定，本文不下判斷** |
 
 ### 2.3 仍未查證的空白
@@ -173,7 +194,7 @@ issue #1 已定調的相關前提：單人使用但資料模型自始帶 `user_i
 | 託管 DB | 閒置休眠 | pooler 模式 | pooler 支不支援 `LISTEN/NOTIFY` | 備註 |
 |---|---|---|---|---|
 | **Neon Free** | 會，**5 分鐘**，免費層**不可關閉** | PgBouncer transaction | ❌ 官方明列不支援（可用去掉 `-pooler` 後綴的 direct 連線繞過） | scale-to-zero 會把 `LISTEN` 訂閱狀態整個丟掉（官方原文：「notifications and listeners... are lost when the session ends」） |
-| **Supabase Free** | 會，低活躍 **7 天**後整個專案暫停 | Supavisor：6543 transaction／5432 session | **未能查證**（官方文件只講 prepared statements，未提 `LISTEN/NOTIFY`） | direct connection 走 IPv6，IPv4 需付費 add-on（僅 Pro 以上可買，US$4/月）；每天有排程寫入天然不會被暫停 |
+| **Supabase Free** | 會，低活躍 **7 天**後整個專案暫停 | Supavisor：6543 transaction／5432 session | **未能查證**（2026-08-06 與 08-09 兩次查證，三個第一手頁面全文皆未出現 `LISTEN`／`NOTIFY`） | ⚠️ **2026-08-09 更正**：IPv4 只擋 **direct connection**；**Supavisor 兩種模式（含 session mode, 5432）官方明文「Always uses an IPv4 address」且免費**。每天有排程寫入天然不會被暫停 |
 | **Render Postgres Free** | 不休眠，但 **30 天到期** | 不提供 pooling | 不適用 | **本專案不可用**（每月搬一次家） |
 | **Fly Managed Postgres** | 官方文件未提及，**推定不休眠但未查證** | PgBouncer，**預設 session** | ✅ **唯一官方明文支援**：「Full PostgreSQL feature compatibility... `LISTEN/NOTIFY`... all work normally」 | **US$38/月 ≈ NT$1,228，超預算 12 倍** |
 | **VPS 自架** | 不休眠 | 自己決定（可不裝 pooler） | ✅（不經 pooler） | 唯一沒有 pooler 陷阱的選項，代價是備份與 OS 維運自理 |
@@ -274,7 +295,7 @@ issue #1 已定調的相關前提：單人使用但資料模型自始帶 `user_i
 ### 7.1 已知事實
 
 - `tech-stack.md` §8：Caddy 只要看到網域名稱就自動申請並續期 Let's Encrypt 憑證，零額外設定；已定調公開在網際網路上。
-- **#10 已經鬆綁了這一題的急迫性**（issue #17 第 3 則留言引用）：原本的顧慮是 WebAuthn 綁 origin，換網域會讓 passkey 全數作廢；但 #10 選定 Google OIDC + GitHub OAuth 後，這個約束消失——**換網域只需到 provider console 改一行 redirect URI，既有登入不受影響**。因此本票**可以先用免費子網域（DuckDNS／Cloudflare 免費子網域）上線，日後想換再換**，網域費從「必須先付」降為「想付再付」。
+- **#10 已經鬆綁了這一題的急迫性**（issue #17 第 3 則留言引用）：原本的顧慮是 WebAuthn 綁 origin，換網域會讓 passkey 全數作廢；但 #10 選定 Google OIDC + GitHub OAuth 後，這個約束消失——**換網域只需到 provider console 改一行 redirect URI，既有登入不受影響**。因此本票**可以先用免費子網域（DuckDNS／~~Cloudflare 免費子網域~~ ⚠️ 2026-08-09 更正：Cloudflare 沒有這項服務，見 §7.2）上線，日後想換再換**，網域費從「必須先付」降為「想付再付」。
 - 同則留言：**Cloudflare Access／Tunnel 已被 #10 否決**，不必再評估——`cloudflared` 靠常駐外連維持隧道，機器一停隧道就斷，加 Tunnel 等於把「否決 serverless」的邏輯（#5 的核心論點）從 `quote-worker` 搬到 `api` 頭上，會讓本票選定的 `auto_stop_machines` 直接失效。
 - 約束 6（見 §0）：無論用哪個網域，Caddy 申請憑證都會讓網域進 Certificate Transparency log，上線數小時內必有掃描器來敲。
 
@@ -282,7 +303,7 @@ issue #1 已定調的相關前提：單人使用但資料模型自始帶 `user_i
 
 | 選項 | 代價 | 風險 |
 |---|---|---|
-| **免費子網域（DuckDNS／Cloudflare 免費子網域）** | NT$0，符合成本偏好；已由 #10 論證換網域成本低，不必一次選對 | 免費子網域是否支援 Caddy 的 ACME 自動化流程（HTTP-01 或 DNS-01 challenge）——**未查證** |
+| **免費子網域（DuckDNS／~~Cloudflare 免費子網域~~）** | NT$0，符合成本偏好；已由 #10 論證換網域成本低，不必一次選對 | ⚠️ **2026-08-09 更正**：**Cloudflare 沒有免費子網域服務**，DuckDNS 是唯一真免費的選項。Caddy 相容性已查證：DuckDNS 支援 A／AAAA／TXT、**無 CNAME**；走 HTTP-01／TLS-ALPN 需 80／443 對外可達（不需外掛），走 DNS-01 需加裝 `caddy-dns/duckdns`（已收錄於 Caddy 官方套件登錄檔） |
 | **自購網域**（.com／.tw 等） | 較「正式」，但 #10 已明確論證此非必要前提 | 年費行情本文未查證 |
 | **平台附贈的預設網域**（如 `*.fly.dev`） | 免額外設定 | 同樣會進 CT log，**不能迴避掃描器問題**；是否可直接綁自訂憑證、是否滿足「公開 + HTTPS」的其他約束未查證 |
 
