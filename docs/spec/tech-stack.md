@@ -183,7 +183,9 @@ v1 預期的路徑是**先用 Fugle 免費層（5 檔訂閱、零開戶、NT$0�
 
 **因此降級路徑改用 yfinance 取延遲報價**，不依賴行情 provider 的快照 API。這也正好說明為什麼報價來源必須抽象化：來源不只一個，而且各有各的洞。
 
-> **[#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) 修訂此段的處理方式**：這個坑本身就是一個 capability 差異，卻被寫死成「另一條路徑」。改為讀 `supports_snapshot` 之後，轉 Shioaji 時快照路徑會**自動可用，不需要有人記得回來改**——寫死的降級路徑會一直留在那裡，即使它的前提早已消失。
+> **[#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) 修訂此段的處理方式**：這個坑本身就是一個 capability 差異，卻被寫死成「另一條路徑」。改為讀能力宣告之後，轉 Shioaji 時快照路徑會**自動可用，不需要有人記得回來改**——寫死的降級路徑會一直留在那裡，即使它的前提早已消失。
+>
+> ⚠️ **2026-08-06／08-09 事實更正**：上面「Fugle 免費層快照不支援」這個**前提本身也是錯的**——不支援的只有**全市場**快照，**單一標的的 `GET /intraday/quote/{symbol}` 免費層可用（60 次/分鐘）**。因此降級路徑**不走 yfinance**，走 provider 自己的 REST；能力宣告也已拆成 `supports_symbol_quote` 與 `supports_market_snapshot`（一個布林值涵蓋兩種能力，會讓 Fugle 被永久標成 `False`、明明有能力卻永遠降級且不報錯）。見 [`realtime-quotes.md`](./realtime-quotes.md) 檔首與 §7。
 
 ### 兩個單元之間怎麼傳 tick
 
@@ -305,6 +307,16 @@ TLS 憑證的申請與續期是那種「會在半夜三點過期時咬你」的�
 
 ### 憑證怎麼來
 
+> ### ⚠️ 2026-08-09 由 [#17](https://github.com/NTUyu016/stock-analytic-platform/issues/17) 推翻：**v1 不公開上網，下面這段的前提已不成立**
+>
+> v1 走 **Tailscale 私有網路**，路由器不開任何埠。連帶三件事：
+>
+> 1. **下面這份 Caddyfile 範例不可直接照抄。** 沒有對外的 80／443，HTTP-01 與 TLS-ALPN **依 Caddy 官方定義就走不通**；它不會噴出「請設定憑證」，而是嘗試 ACME、失敗、重試，**使用者只看到「連不上」**。
+> 2. **憑證改由 Tailscale 提供**：Caddy 2.5+ 看到 `.ts.net` 網域就不跑 ACME，改向本機 tailscaled 取憑證，**零設定且自動續期**。
+> 3. **「憑證會在半夜三點過期時咬你」這個顧慮在 v1 反而不存在**——它只在 `tailscale cert` 手動寫檔那條路上成立，而 [`deployment.md`](./deployment.md) §2.4 已明文禁用那條。
+>
+> **本節其餘論證（為什麼用 Caddy 而不讓 FastAPI 發靜態檔、Caddy vs nginx 的對照）完全不受影響。** 完整決定見 [`deployment.md`](./deployment.md) §2。
+
 [#10](https://github.com/NTUyu016/stock-analytic-platform/issues/10) 定調**公開在網際網路上**（2026-08-02 修訂，先前為「不公開」）。決定性理由是**技術難度**：內網自簽方案（`tls internal`）需要在每台裝置上手動安裝並信任自簽 CA，iOS 上尤其繁瑣（安裝描述檔後還要另外到「憑證信任設定」手動啟用）。公開 + Let's Encrypt 由 Caddy 全自動處理，反而是難度較低的路徑。
 
 因此使用標準 ACME 流程 —— Caddy 只要看到網域名稱就自動申請並續期，不需要任何額外設定：
@@ -333,6 +345,8 @@ stock.example.com {           # 有公開網域即自動走 Let's Encrypt
 [#2 §2.6](../research/tw-realtime-quote-sources.md) 查證：依 TWSE《交易資訊使用管理辦法》§14 / §14-1 / §27，**券商行情不得轉供第三人**，且富果條款明文禁止「將交易資訊……傳送予第三人」。
 
 網站公開在網際網路上、但行情只在登入後呈現，仍屬「自用、非揭示用途」，在授權範圍內。但因此有一條不可違反的規則：
+
+> ⚠️ **2026-08-09**：v1 改走 Tailscale 私網後，這條規則**一個字都不放寬**。它的來源是 TWSE 管理辦法（法遵），不是網路拓樸；且 [`deployment.md`](./deployment.md) §10.2 把「改回公開」列為遷移路徑第一項。**Tailscale 是多一道防線，不是把這條規則換掉。**
 
 > **任何未登入即可存取的頁面或 API 端點，都不得包含即時報價、五檔、逐筆成交或其衍生數值。**
 

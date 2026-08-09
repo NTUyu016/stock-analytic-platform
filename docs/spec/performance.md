@@ -691,6 +691,19 @@ MAX(CASE WHEN close IS NOT NULL THEN d END) OVER (
 
 **所以 §2.2 的聯集日曆只解掉了「跨市場」那一半。** 剩下一半必須靠寫法解決：
 
+> ### ⚠️ 2026-08-09 由 [#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 擴充：不等式聚合還要**乘上後續的分割比率**
+>
+> 下面這條規則仍然完全成立（禁止的是等值 join，不是禁止乘法），但 `SUM(signed_qty)` 這個形狀**只在沒有分割的情況下是對的**。
+>
+> `SPLIT` 型別**不存股數增減量、只存 `ratio`**（存 delta 等於把分割變成快照，補登一筆分割日之前的舊交易時它永遠不會被修正——**正是 §8.5 承諾會自動修好、卻不會的那種情況**）。因此正確的推導是：
+>
+> ```sql
+> SUM( t.signed_qty * PRODUCT(s.ratio)                      -- s 是 t 之後、D 之前的分割
+>    ) FILTER (WHERE t.traded_on <= D AND t.type <> 'SPLIT')
+> ```
+>
+> 三個細節（完整說明見 [`corporate-actions.md`](./corporate-actions.md) §1.5）：**`s.traded_on > t.traded_on` 嚴格大於**（恢復買賣當日的交易已經是分割後股數）；**每股成本同步除以 `ratio`**（否則未實現損益在分割當天憑空跳四倍，而那是個合法數字）；**不得用 `exp(sum(ln()))` 算乘積**（走 `double precision`，1,000 股會變成 `3999.9999999999995`）。
+
 > ### 硬性規則：部位推導一律用 `traded_on <= D` 的不等式聚合，**不得把交易 join 到日曆上**
 >
 > ```sql

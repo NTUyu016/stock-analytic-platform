@@ -120,14 +120,18 @@
   - `BUY` / `SELL`：`quantity` + `price` + `fee` + `tax`（此處 `tax` 為證交稅）
   - `CASH_DIVIDEND`：`cash_amount`（宣告**總額**）+ `tax`（配息當下扣掉的**補充保費／就源扣繳**）。不改股數，**不改成本基礎**。實收淨額 = `cash_amount` − `tax`
   - `STOCK_DIVIDEND`：只有 `quantity`，總成本不變 → 均價被稀釋
-  - `SPLIT`：只有 `quantity`（股數增減量）與 `ratio`。**無現金流、總成本基礎不變**。涵蓋分割／反分割／面額變更三種公告類型（三者共用同一條 TWSE 公式），**不涵蓋減資**
+  - `SPLIT`：**只有 `ratio`，`quantity` 必須是 NULL**。無現金流、總成本基礎不變。涵蓋分割／反分割／面額變更三種公告類型（三者共用同一條 TWSE 公式），**不涵蓋減資**
   - `ADJUSTMENT`：`quantity` 與 `cash_amount` 可正可負，`note` 必填。減資、換股、合併走這裡
 
 > **[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 新增的硬性約束**：
 > ```sql
 > CHECK ((type = 'SPLIT') = (ratio IS NOT NULL))
+> CHECK (ratio IS NULL OR ratio > 0)
+> CHECK (type <> 'SPLIT' OR quantity IS NULL)
 > ```
-> **必須是雙向等式，不可寫成 `CHECK (type <> 'SPLIT' OR ratio IS NOT NULL)`。** 單向版本允許非 `SPLIT` 的列填入 `ratio`，而那正是 [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 已識別過的形狀——**`CHECK` 對不該有值的欄位放行，不報錯**。詳見 [`corporate-actions.md`](./corporate-actions.md) §1.4。
+> 第一條**必須是雙向等式，不可寫成 `CHECK (type <> 'SPLIT' OR ratio IS NOT NULL)`。** 單向版本允許非 `SPLIT` 的列填入 `ratio`，而那正是 [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 已識別過的形狀——**`CHECK` 對不該有值的欄位放行，不報錯**。
+>
+> 第三條是 2026-08-09 冷讀驗收（#18）撞出來的：**`SPLIT` 不得存股數增減量**。存 delta 等於把分割變成一個快照，而補登一筆分割日之前的舊交易時那個 delta 永遠不會被修正——`performance.md` §8.5「重算保證補登後歷史自動正確」在此處**靜默失效**。部位推導改為**比率縮放的不等式聚合**，詳見 [`corporate-actions.md`](./corporate-actions.md) §1.5。
 >
 > ⚠️ **`CHECK` 擋不住真正的風險**：它保證沒有非法的 type 值，但擋不住「某段程式碼只枚舉了 `BUY`/`SELL`，忘了 `SPLIT`」。因此規定**所有依 `type` 分支的程式碼必須是窮舉式的**（`match` + `case _: raise`），不得有靜默的 fall-through。
 
@@ -200,7 +204,8 @@
 | `id` | `bigserial` PK | |
 | `user_id` | `bigint` FK NOT NULL | |
 | `instrument_id` | `bigint` FK NOT NULL | |
-| `rule_type` | `text` NOT NULL | 六種具名類型之一，`CHECK` 列舉 |
+| `portfolio_id` | `bigint` FK NULL | **依部位的規則（成本報酬率、追蹤停損）必須有值；純價格規則必須為 NULL**。`CHECK` 依 `rule_type` 雙向約束（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 補） |
+| `rule_type` | `text` NOT NULL | 六種具名**類別**、展開為九個列舉值，`CHECK` 列舉（見 [`alerts.md`](./alerts.md) §1 的完整清單） |
 | `threshold` | `numeric(20,8)` NOT NULL | 語意隨 `rule_type` 而異 |
 | `is_enabled` | `boolean` NOT NULL DEFAULT true | |
 | `is_deleted` | `boolean` NOT NULL DEFAULT false | 軟刪除，沿用 `instrument.is_active` 先例 |
@@ -217,7 +222,12 @@
 | `last_triggered_at` | `timestamptz` NULL | |
 | `peak_price` | `numeric(20,8)` NULL | 僅 `TRAILING_STOP` |
 | `peak_since` | `date` NULL | 僅 `TRAILING_STOP`，峰值起算日（建倉日） |
+| `suspended_reason` | `text` NULL | **系統暫停評估的原因**；NULL = 未暫停（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 新增） |
 | `updated_at` | `timestamptz` NOT NULL | |
+
+> **`suspended_reason` 為什麼不是去改 `alert.is_enabled`**：`CONTEXT.md` 明訂「**使用者設的是 `is_enabled`**」，系統去覆寫它等於抹掉使用者的意圖，而且使用者重新建倉後不會自動恢復。放在 `alert_state` 還有第二個理由——這張表的定位就是「**全部可以重算**」，而暫停與否本來就是從 `transaction` + `pending_action` 推導出來的，不是持久事實。
+>
+> 兩個已知的填值來源：**股數歸零時的類型 3／4**（[`alerts.md`](./alerts.md) §1）與**未確認且會改變股數的 `pending_action`**（[`corporate-actions.md`](./corporate-actions.md) §2.4）。兩者都必須在規則面板上顯示這個字串——[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 的原則是「用行為表達嚴重度」，而沒被看見的行為等於沒有發生。
 
 > **[#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 新增。** 與 `alert` 分表的理由是**可重建性不同**：`alert` 是使用者打的字，毀了就沒了；`alert_state` 全部可以從 `transaction` + `daily_close` + 當前 Quote 重算。分表後「狀態疑似錯亂」的修復是一次安全的整表重建，而非在使用者資料上動刀。
 
@@ -246,12 +256,22 @@
 | `user_id` | `bigint` FK | |
 | `kind` | `text` | `CORPORATE_ACTION` / `IMPORT_CONFLICT` |
 | `instrument_id` | `bigint` FK | 可為空 |
+| `portfolio_id` | `bigint` FK | **`CORPORATE_ACTION` 必填**（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 補）。`transaction.portfolio_id` 是 NOT NULL，沒有這一欄就無法決定確認後要寫進哪一個 Portfolio |
+| `resolved_at` | `timestamptz` NULL | 已處理時間；NULL = 待處理（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 補） |
+| `notified_count` | `int` NOT NULL DEFAULT 0 | 已通知次數（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 補） |
+| `last_notified_at` | `timestamptz` NULL | 同上 |
 | `effective_on` | `date` | **該事件生效、市場開始以新股數與新價格交易的第一個交易日**（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 改寫；原記「除權息基準日」） |
 | `proposed` | `jsonb` | 系統算出的預填值。**減資場合刻意不含比率**——官方資料源分離不出換股率 |
 | `source` | `text` | 產生來源，如 `twse_TWT48U_ALL`、`finmind_TaiwanStockSplitPrice`。⚠️ **兩者的授權性質不對等**：除權息走政府資料開放授權的官方端點，分割與減資**只有 FinMind 這條路**（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20)） |
 | `created_at` | `timestamptz` | |
 
-- 待使用者確認的項目。**確認後才 INSERT 進 `transaction`，本表列刪除或標記已處理。**
+- 待使用者確認的項目。**確認後才 INSERT 進 `transaction`；本表列標記 `resolved_at`，不刪除。**
+
+> **[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 把「刪除或標記」這個二選一選掉了：選標記。** 兩個理由：（a）[`corporate-actions.md`](./corporate-actions.md) §4.7 要求「超過 5 個交易日仍未確認再通知一次」，那需要記住已通知幾次，刪除的列記不住；（b）保留「系統偵測到什麼、使用者怎麼處理」的稽核軌跡。
+>
+> **這不違反「不在 `transaction` 加 `status`」的原則**——那條原則的理由是「漏寫 `WHERE status` **不報錯**」。這裡漏寫 `WHERE resolved_at IS NULL` 的後果是**畫面上多出已處理的項目**，看得見、會被抱怨，不是靜默失效。**判準從來不是「有沒有狀態欄」，是「漏寫的時候看不看得出來」。**
+
+- **一次公司行動可能產生多列**：同一支 Instrument 在兩個 Portfolio 各有部位時，**逐 Portfolio 各產生一列**，各自算各自的股數，[`corporate-actions.md`](./corporate-actions.md) §1.4(d)「新股數必須是整數」也**逐 Portfolio 判定**（合計判定會讓兩個各 500 股的 Portfolio 在 `ratio=1.5` 時通過，而它們各自都算不出整數）。
 - ⚠️ **這張表存在的唯一理由，是不要在 `transaction` 加 `status` 欄。** 加 `status` 會讓每個查詢都必須記得寫 `WHERE status = 'confirmed'`，而**漏寫不會有任何錯誤訊息** —— 只會讓未確認的股利偷偷混進損益與成本基礎。這與本文核心原則第 5 條、以及 [#10](https://github.com/NTUyu016/stock-analytic-platform/issues/10) 對 `user_id` 的警告是同一個形狀。
 - 另立表則讓 `transaction` 維持「**裡面每一列都是事實**」的不變量，**現有查詢一行都不用改**。
 - 決策來源：[#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19)，詳見 [`transaction-input.md`](./transaction-input.md) §8。

@@ -26,6 +26,18 @@
 
 ## 1. 認證發生在哪一層：應用層
 
+> ### ⚠️ 2026-08-09 由 [#17](https://github.com/NTUyu016/stock-analytic-platform/issues/17) 修訂的前提
+>
+> 本文多處以「`api` 直接暴露在公開網際網路上」「上線後數小時內一定會有掃描器來敲」為前提。**v1 改走 Tailscale 私有網路**，路由器不開任何埠，這些敘述在 v1 **不再成立**（CT log 仍會收錄 `.ts.net` 名稱，但官方明文「access to your devices is still restricted by Tailscale as normal」）。
+>
+> **但本文的每一個決定都不變，而且理由都還在**：
+>
+> - **認證留在應用層**：Tailscale 是**第二道**防線，不是認證的替代品。§4 的 allowlist、§6 的 `(provider, subject)`、§5 的伺服器端 session 一條都不放寬。
+> - **不放邊界閘門**：§1「為什麼不用邊界閘門」對 Cloudflare Access／Tunnel 的否決理由（`cloudflared` 的常駐外連讓機器停機後喚不醒）在 v1 依然成立，且 Tailscale **不是**同一類東西——它不代理流量進 Caddy 之前的認證，只決定誰的封包到得了這台機器。
+> - **[`deployment.md`](./deployment.md) §10.2 把「改回公開」列為遷移路徑的第一項**，屆時本文所有前提會原封不動地回來。**這正是 v1 不趁機省掉登入的理由。**
+>
+> 受影響而**仍未改寫**的具體段落：§1「要付的帳」與「威脅盤點」、§8「為什麼第一個帳號用 CLI 建」（CT log 時間窗——該理由在 v1 弱化但沒消失，見 §8.1）。閱讀時請套用本欄。
+
 ### 決定
 
 自己的登入流程、自己的 session。Caddy 只做 TLS 與反向代理，不參與身分判斷。**不在前面放 Cloudflare Access / Tunnel 之類的邊界閘門。**
@@ -369,14 +381,34 @@ GitHub 有完全對應的坑：**`login`（使用者名稱）是可以改的**�
 
 ### 決定
 
-一支管理 CLI，至少兩個子指令：
+一支管理 CLI，**三個**子指令：
 
 ```bash
 uv run manage user create --email you@example.com     # 建立 app_user
 uv run manage user grant-session --user-id 1          # 直接發一張有效 session
+uv run manage user link-identity --user-id 1 \
+       --from-attempt 7                                # ⚠️ 見 §8.1
 ```
 
-兩者共用同一個信任前提：**你有那台機器的存取權**。
+三者共用同一個信任前提：**你有那台機器的存取權**。
+
+### 8.1 ⚠️ 沒有第三個子指令，照著這份規格做出來的系統**第一次登入必然被拒**
+
+> **這是 2026-08-09 的冷讀驗收（#18）撞出來的洞。**
+
+§4 定「查無此人 → 拒絕，且不自動建立帳號」，而 §6 定 `user_identity` 的 key 是 `(provider, subject)`。原本的兩個子指令**只能建立 `app_user`，沒有任何一個能寫入 `user_identity`**——而**使用者不可能自己知道 Google 發給他的 `sub`**（那是一串 21 位數字，只出現在 ID token 裡）。
+
+**決定：走「先被拒、再綁定」，不走「先猜 subject」。**
+
+1. **登入被拒時，把該次嘗試寫進 `login_attempt` 稽核表**（`provider`、`subject`、`email`、`name`、`attempted_at`、`outcome`）。
+2. 使用者在機器上執行 `user link-identity --user-id 1 --from-attempt 7`，把那一次嘗試的 `(provider, subject)` 綁到指定的 `app_user`。
+3. 再登入一次即可通過。
+
+**為什麼不做「首次登入者自動成為擁有者」**：理由與 §8 下一節完全相同（CT log 的時間窗），且**那個理由在 v1 的 Tailscale 私網下弱化了、但沒有消失**——[`deployment.md`](./deployment.md) §10.2 明列「改回公開」是遷移路徑的第一項，屆時這個自動綁定會變成一個對全世界開著的入口，**而那時沒有人會記得回來關掉它**。
+
+**為什麼不用 `--provider google --subject <sub>` 讓使用者自己填**：那要求使用者自行從 ID token 裡挖出 `sub`，而挖錯不會報錯——它只是綁定到一個永遠不會有人用的身分，然後下次登入還是被拒，**而錯誤訊息一模一樣**。`--from-attempt` 讓那串數字從頭到尾不必經過人手。
+
+> **順帶的紅利**：`login_attempt` 本來就該存在。§1「這張票真正在保護什麼」已指出上線後必有掃描器來敲；**被拒絕的登入嘗試是這個系統唯一會留下的入侵訊號**，沒有它就等於沒有任何存取稽核。
 
 ### 為什麼第一個帳號用 CLI 建，而不是「首次登入者自動成為擁有者」
 
@@ -394,11 +426,17 @@ uv run manage user grant-session --user-id 1          # 直接發一張有效 se
 
 ---
 
-## 9. WebSocket 的身分驗證
+## 9. 串流連線的身分驗證
+
+> ### ⚠️ 2026-08-09 修訂：下游是 **SSE** 不是 WebSocket
+>
+> 本節原標題為「WebSocket 的身分驗證」。[#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) 後來選定 `api` → 瀏覽器走 **SSE**（[`realtime-quotes.md`](./realtime-quotes.md) §4），本節寫作時那個決定還沒做。
+>
+> **底下的論證一字不用改，而且變得更強**：瀏覽器原生的 `EventSource` **同樣不支援自訂 header**，且**連 subprotocol 這種偏門的夾帶手段都沒有**——它比 WebSocket 更沒有選擇。**cookie 是唯一乾淨的路**，這使 §5 選伺服器端 session 的理由在 SSE 上比在 WebSocket 上更決定性。
 
 ### 決定
 
-**WebSocket 握手就是一個普通的 HTTP 請求，同源 cookie 會自動帶上。** 因此：
+**SSE 連線（以及任何 WebSocket 升級）的建立就是一個普通的 HTTP 請求，同源 cookie 會自動帶上。** 因此：
 
 > 握手時查同一份 session，通過才升級協定；不通過回 401，**拒絕升級**。
 
@@ -412,7 +450,20 @@ uv run manage user grant-session --user-id 1          # 直接發一張有效 se
 
 Cookie 沒有這個問題。這條同時天然滿足 `tech-stack.md` §8 的「所有回傳 Quote 的端點都在認證中介層之後，不可有例外路由」。
 
-**交給 [#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) 的**：連線建立後，若 session 在連線存續期間被撤銷該怎麼處理（定期重查 vs 撤銷時主動斷線）。本票只定「握手時必驗、憑證不得走 query string」。
+### 9.1 連線存續期間 session 被撤銷怎麼辦（2026-08-09 補答）
+
+> 本節原本把這題**交辦給 #13**，而 [`realtime-quotes.md`](./realtime-quotes.md) 從頭到尾沒有接下它——2026-08-09 的冷讀驗收（#18）發現這是一個**懸空的交辦**。在此答掉。
+
+**這不是可以留白的細節**：SSE 串流送的是即時報價，而 `tech-stack.md` §8 那條「未登入不得取得即時報價」是**法遵**而非產品規則。一條在使用者登出後仍持續推價的連線，違反的是同一條規則——只是違反的方式是「當初驗過了」。
+
+**決定，兩層**：
+
+1. **主動**：登出、或身分被移出 allowlist 時，`api` **立即關閉該使用者所有開著的 SSE 連線**。單一行程內是一張連線註冊表；[`realtime-quotes.md`](./realtime-quotes.md) §3 已有的 `LISTEN/NOTIFY` 通道可承載跨行程的撤銷訊號，不需要新機制。
+2. **兜底**：每條連線**至多每 60 秒**重查一次 session（掛在既有的 800ms 節拍上判斷是否到期即可，不另開計時器）。過期或查無即關閉連線。
+
+**為什麼要兩層**：只有主動關閉的話，行程重啟、連線註冊表遺失、或撤銷訊號漏送，那條連線就會**一直合法地推價下去且不報錯**。只有定期重查的話，登出後最長還會收 60 秒的報價——對法遵而言那是一個真實的窗口。**兩層各自補對方的失效模式，而它們的失效原因不相關。**
+
+**60 秒的理由**：它必須遠大於節拍（800ms，否則等於每個節拍打一次資料庫），且遠小於 session 有效期（30 天）。這個數字是設定值，不寫死。
 
 ---
 
@@ -471,6 +522,6 @@ Cookie 沒有這個問題。這條同時天然滿足 `tech-stack.md` §8 的「�
 
 | 議題 | 票 |
 |---|---|
-| 網域來源與費用（**可先用免費子網域**，OAuth 換網域只需改 redirect URI）、scale-to-zero 被陌生請求喚醒的支出上限 | [#17](https://github.com/NTUyu016/stock-analytic-platform/issues/17) |
-| WebSocket 連線存續期間 session 被撤銷的處理方式 | [#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) |
+| ~~網域來源與費用、scale-to-zero 被陌生請求喚醒的支出上限~~ → **已由 #17 答畢（2026-08-09）**：v1 走 Tailscale 私網、不需網域、也沒有 scale-to-zero，故「陌生請求喚醒」的成本項消失。見 [`deployment.md`](./deployment.md) §2 | [#17](https://github.com/NTUyu016/stock-analytic-platform/issues/17) |
+| ~~WebSocket 連線存續期間 session 被撤銷的處理方式~~ → **#13 沒有接下這個交辦**，已於 2026-08-09 由 #18 的驗收撈出並在 **§9.1** 答畢 | ~~[#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13)~~ 本文 §9.1 |
 | 開放他人使用的法遵路徑取捨 | [#1](https://github.com/NTUyu016/stock-analytic-platform/issues/1) — Not yet specified，需獨立一張圖 |

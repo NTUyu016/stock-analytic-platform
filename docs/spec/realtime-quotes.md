@@ -14,6 +14,31 @@
 
 **本節只更正事實，不重新決策。** 受影響的決策標示為「待重新決定」，由 [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 一併處理。
 
+> ### ✅ 2026-08-09 補決：那兩個「待重新決定」，#15 沒有接下來
+>
+> 2026-08-09 的冷讀驗收（[#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18)）發現：更正 1 與更正 2 標的「待重新決定」**從來沒有人決定**，而本文 §2／§5／§7 的正文仍停在被推翻前的版本——實作者面對的是**同一件事三種說法**。在此決掉，並已同步改寫正文。
+>
+> **決定 1：`supports_snapshot` 拆成兩個能力，§7 第 3 層改走 Fugle REST。**
+>
+> ```python
+> supports_symbol_quote:   bool   # 單一標的報價  fugle_free=True   shioaji=True
+> supports_market_snapshot: bool  # 全市場快照    fugle_free=False  shioaji=True
+> ```
+>
+> 一個布林值涵蓋兩種能力，正是更正 1 指出的危險：**Fugle 會被永久標成 `False`，明明有能力卻永遠降級，而且不報錯**。拆開之後，§7 第 3 層讀的是 `supports_symbol_quote`，Fugle 免費層直接為真。
+>
+> **決定 2：額度的單位換算屬於 adapter，核心不得自己算。**
+>
+> `max_subscriptions` 改名 **`max_subscription_slots`**（單位：**slot**），並要求每個 adapter 實作
+>
+> ```python
+> def slots_needed(symbols: Sequence[str], channels: Sequence[Channel]) -> int
+> ```
+>
+> Fugle 回 `len(symbols) * len(channels)`，Shioaji 回 `len(symbols)`。**核心只問「這個訂閱計畫要幾個 slot、夠不夠」，不知道也不需要知道兩家的單位不同。**
+>
+> **為什麼不是「把 Fugle 的額度換算成檔數」**：那要求核心知道「Fugle 的 5 要除以頻道數」，也就是把 provider 的計價規則寫進核心——正是 §2 那條硬性規則禁止的事。改名而不只是加註解，是因為 `max_subscriptions` 這個名字**會誘導人拿它跟持股檔數比大小**，而那個比較在 Fugle 上是錯的、且不報錯。
+
 | # | 本文原本說 | 查證後的事實 | 後果 |
 |---|---|---|---|
 | 1 | 「Fugle 免費層沒有快照 API」，故 §7 第 3 層降級走 **yfinance（延遲 15 分鐘）** | **不支援的只有全市場快照 `/snapshot/*`。單一標的的 `GET /intraday/quote/{symbol}` 免費層可用，60 次/分鐘**，回傳含最佳五檔、累計量、暫停交易旗標，且與 WebSocket **同源同定義** | §7 第 3 層走 yfinance 是**不必要的降級**：異機構、異定義、延遲 15 分鐘，換來的東西 Fugle 本來就給。<br>`supports_snapshot: bool` **粒度不足**，至少要拆成 `supports_symbol_quote` 與 `supports_market_snapshot`。<br>⚠️ 更危險的是 §2 稱這個布林值讓「轉 Shioaji 時快照路徑自動可用」——**布林值定義錯了，那個「自動」就自動到錯的地方去**，Fugle 會被永久標成 `False`，明明有能力卻永遠降級。<br>**→ 待重新決定** |
@@ -177,15 +202,25 @@ Fugle 與 Shioaji 的 SDK **都是從自己的背景執行緒**呼叫 callback �
 ```python
 @dataclass(frozen=True)
 class ProviderCapabilities:
-    max_subscriptions: int    # fugle_free=5      shioaji=200   fake=3
-    max_connections: int      # fugle_free=1      shioaji=5
-    supports_snapshot: bool   # fugle_free=False  shioaji=True
-    supports_odd_lot: bool    # fugle_free=False  shioaji=True
+    max_subscription_slots: int     # fugle_free=5      shioaji=200   fake=3
+    max_connections: int            # fugle_free=1      shioaji=5
+    supports_symbol_quote: bool     # fugle_free=True   shioaji=True
+    supports_market_snapshot: bool  # fugle_free=False  shioaji=True
+    supports_odd_lot: bool          # fugle_free=True   shioaji=True   ← 盤中零股
 ```
 
-> **`src/core/` 內不得出現字面量 `5`。** 所有「是否超過訂閱額度」的判斷一律讀 `capabilities.max_subscriptions`。
+每個 adapter 另外必須實作**額度換算**（這是 2026-08-09 補決的，見檔首）：
 
-**這條同時修好了一個既有的洞**：`tech-stack.md` §4 發現「Fugle 免費層沒有快照 API，所以降級路徑改用 yfinance」，但當時是**寫死成另一條路徑**在處理。改成讀 `supports_snapshot` 之後，轉 Shioaji 時快照路徑會自動可用，**不需要有人記得回來改**。
+```python
+def slots_needed(symbols: Sequence[str], channels: Sequence[Channel]) -> int:
+    ...   # Fugle: len(symbols) * len(channels)   Shioaji: len(symbols)
+```
+
+> **`src/core/` 內不得出現字面量 `5`，也不得自行把 slot 換算成檔數。** 所有「是否超過訂閱額度」的判斷一律是 `adapter.slots_needed(...) <= capabilities.max_subscription_slots`。
+>
+> ⚠️ **欄位名之所以從 `max_subscriptions` 改掉**：那個名字會誘導人拿它跟「持股檔數」比大小，而**那個比較在 Fugle 上是錯的、且不報錯**（5 個額度是 5 個「標的×頻道」配對，不是 5 檔）。
+
+**這條同時修好了一個既有的洞**：`tech-stack.md` §4 發現「Fugle 免費層沒有快照 API，所以降級路徑改用 yfinance」，但當時是**寫死成另一條路徑**在處理，而且**那個前提本身也是錯的**（見檔首更正 1）。改成讀 `supports_symbol_quote` 之後，Fugle 免費層直接為真、轉 Shioaji 也自動可用，**不需要有人記得回來改**。
 
 ### ⚠️ 硬性規則：統一 Quote 型別的量必須是「當日累積」
 
@@ -358,7 +393,8 @@ SSE 也沒有內建 heartbeat，需定期送註解行（`: keepalive\n\n`）撐�
 
 | 事實 | 來源 |
 |---|---|
-| Fugle 免費層訂閱上限 5 檔 | [#2 §2.1](../research/tw-realtime-quote-sources.md) |
+| Fugle 免費層訂閱上限 **5 個 slot＝5 個「標的×頻道」配對**（⚠️ 不是 5 檔，見檔首更正 2） | [`fugle-free-tier-capabilities.md`](../research/fugle-free-tier-capabilities.md) |
+| 因此 **5 檔持股只能訂一個頻道**；#15 已定選 `trades` | 檔首「新暴露的取捨」；[`alerts.md`](./alerts.md) |
 | 使用者持股在 5 檔以內 | issue #1 已定調前提 |
 | 美股不需即時，走 yfinance 盤後 | issue #1 |
 | 儀表板四個面板**沒有大盤指數** | `dashboard-ui.md` §1 |
@@ -379,7 +415,9 @@ SSE 也沒有內建 heartbeat，需定期送註解行（`: keepalive\n\n`）撐�
 
 ### 超過額度時：明確中斷，不優雅降級
 
-> worker 啟動時若算出應訂閱標的數 > `capabilities.max_subscriptions`，**訂閱其中 N 檔（依 `instrument_id` 這類確定性順序即可），並產生一則明確的警示告訴使用者「行情額度已滿，請啟動 #8」。**
+> worker 啟動時若 `adapter.slots_needed(symbols, channels) > capabilities.max_subscription_slots`，**訂閱其中放得下的部分（依 `instrument_id` 這類確定性順序即可），並產生一則明確的警示告訴使用者「行情額度已滿，請啟動 #8」。**
+>
+> ⚠️ **判斷式必須是 slot 對 slot，不可拿「標的數」去比**（2026-08-09 補決，見檔首）：Fugle 的 5 個額度是 5 個「標的×頻道」配對，**5 檔持股訂兩個頻道就是 10，早就爆了**——而拿檔數去比會算出「5 ≤ 5，沒問題」，然後在連線時被 provider 拒絕。
 
 **刻意不做的事**：不按市值挑「最重要的」、不做逐列降級 UI、不修訂 `dashboard-ui.md`。
 
@@ -458,8 +496,10 @@ SSE 只送**有變動的**報價（§6）。但使用者開頁的瞬間什麼都
 |---|---|---|
 | 1 | `api` 記憶體中的最新報價表 | 已連著看一陣子 |
 | 2 | **向 worker 索取全量快照**（`NOTIFY 'quote_request'`） | `api` 剛醒來 |
-| 3 | **yfinance 延遲報價** | 盤中但 worker 缺席 |
+| 3 | **provider REST 單一標的報價**（Fugle `GET /intraday/quote/{symbol}`，免費層 60 次/分鐘） | 盤中但 worker 缺席 |
 | 4 | **`daily_close` 收盤價** | 非交易時段 |
+
+> ⚠️ **2026-08-09 修訂**：第 3 層原本是「yfinance 延遲報價」。檔首更正 1 已查證那是**不必要的降級**——Fugle 免費層的單一標的報價可用，且與 WebSocket **同源同定義**。改走 provider REST 之後，第 3 層與第 1、2 層的數字是同一個機構、同一套定義，只差新鮮度；原設計是異機構、異定義、延遲 15 分鐘。**這一層要讀 `capabilities.supports_symbol_quote`，不得寫死。**
 
 第 2 層等一個短逾時（約 1 秒）無回應即往下掉。
 
@@ -485,7 +525,7 @@ api      ◀──NOTIFY 'quote_updates'────┘  （回送記憶體中�
 
 ### ⚠️ 第 3、4 層必須外顯
 
-`dashboard-ui.md` §3 規定降級要**同時**做兩件事：顯示橫幅說明 **＋ 報價數字降透明度**。第 3 層（yfinance 延遲 15 分鐘）在畫面上與即時價**長得一模一樣**，不標示的話使用者會盯著 15 分鐘前的價格做判斷。
+`dashboard-ui.md` §3 規定降級要**同時**做兩件事：顯示橫幅說明 **＋ 報價數字降透明度**。第 3 層在畫面上與即時價**長得一模一樣**，不標示的話使用者會盯著一個不會再跳動的數字做判斷——**改走 Fugle REST 之後這一條更重要，不是更不重要**：原本 yfinance 至少差 15 分鐘、有機會從數字本身看出不對，現在第 3 層的價格是**正確的當下價**，只是不會再更新，**畫面上完全看不出它已經停了**。
 
 ---
 
