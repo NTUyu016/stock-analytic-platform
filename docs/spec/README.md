@@ -44,7 +44,7 @@
 | [`performance.md`](./performance.md) | 每次從 Transaction 重算、XIRR 與 TWR、基準含息、曲線日曆、**§8 七個會靜默出錯的地方**、**§8A 十一條不變量** | [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) |
 | [`corporate-actions.md`](./corporate-actions.md) | `SPLIT` 具名型別與比率、峰值分割調整、減資／換股的分流、偵測與未確認處理 | [#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) |
 | [`alerts.md`](./alerts.md) | 六種具名規則類型、回歸重置去重、追蹤停損完整版、管道 Discord 且內文不含金額 | [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) |
-| [`analysis-dimensions.md`](./analysis-dimensions.md) | 個股分析頁六維、Coverage 取代 confidence、資料不足一律明說 | [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) |
+| [`analysis-dimensions.md`](./analysis-dimensions.md) | 個股分析頁六維、Coverage 取代 confidence、資料不足一律明說、**§10 每一維的完整算法**、**§11 值域與權重**、**§12 五級切點與 Coverage 門檻**、**§13 個股→產業類指數對照**、**§15 對 `data-model.md` 的修訂建議** | [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) |
 
 ### 介面
 

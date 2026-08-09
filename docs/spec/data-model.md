@@ -63,11 +63,14 @@
 | `symbol` | `text` | `2330`、`NVDA`、`BTC-USD` |
 | `name` | `text` | 台積電 |
 | `currency` | `char(3)` | 該標的的報價幣別 |
-| `instrument_type` | `text` | `STOCK` / `ETF` / `CRYPTO` |
+| `instrument_type` | `text` | `STOCK` / `ETF` / `CRYPTO`。⚠️ **不得由反查自動決定**——它決定證交稅是 0.3% 還是 0.1%，見 [`transaction-input.md`](./transaction-input.md) §5 |
+| `industry_code` | `text` NULL | 官方產業別代號（[#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) 補）。⚠️ **代號語意隨 `market` 而異，必須連 `market` 一起解讀**。ETF、美股、crypto 恆為 NULL |
 | `is_active` | `boolean` | 下市/下架後設 false，不刪除（歷史交易仍需引用） |
 
 - UNIQUE `(market, symbol)`
+- FK `(market, industry_code)` → `industry_category(market, industry_code)`。**NULL 不受 FK 約束**——這正是 ETF 需要的行為，不必額外開洞。
 - 台積電台股與其 ADR 是兩列。
+- ⚠️ **`industry_code` 不可用 yfinance 的 `info["sector"]` 填。** 那是 GICS 英文分類（實測 `2330.TW → Technology / Semiconductors`），與證交所產業別不是一對一，**沒有任何一檔 MI_INDEX 類指數對應得上**。填錯的表現是「產業比較這一維永遠不可用」或「對到錯的指數」，兩種都不報錯。詳見 [`analysis-dimensions.md`](./analysis-dimensions.md) §15.1。
 
 ### `instrument_provider_symbol`
 | 欄位 | 型別 | 說明 |
@@ -197,6 +200,43 @@
 - **[#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 新增。** 它同時是**台股交易日曆**的來源（[`performance.md`](./performance.md) §2.2 規定日曆不可從自己持有的標的推導 —— 停止買賣期間 `daily_close` 沒有列，若持股集中在該檔，那幾天會整個從日曆消失且圖看起來完全正常）。
 - ⚠️ **不把指數塞進 `daily_close`。** 那樣做的話，**所有掃 `daily_close` 算持股市值的查詢從此都必須記得排除指數列** —— 與 [#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 拒絕 `transaction.status`、[#10](https://github.com/NTUyu016/stock-analytic-platform/issues/10) 對 `user_id` 的警告是同一個形狀。另立表讓 `daily_close` 維持不變量：**裡面每一列都是一支可持有標的的價格。**
 - 主來源為 TWSE `www.twse.com.tw/indicesReport/MFI94U?response=open_data`（**政府資料開放授權條款－第 1 版**），FinMind `TaiwanStockTotalReturnIndex` 為備援（實測 5,807 列**逐列完全相同**）。回溯上限 2003-01-02。
+
+### `industry_category`
+
+參考資料，全域共用，**不帶 `user_id`**（核心原則 4）。[#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) 新增。
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `market` | `text` | `TWSE` / `TPEX` |
+| `industry_code` | `text` | 兩位代號，如 `24` |
+| `industry_name` | `text` | 官方產業別名稱，如「半導體業」 |
+| `industry_index_name` | `text` NULL | 對應的 MI_INDEX 類指數名稱。**NULL = 該產業別沒有對應的類指數** |
+
+- PK `(market, industry_code)`
+- **種子資料**：上市 33 列、上櫃 28 列（上櫃的 `industry_index_name` **全部為 NULL**）。完整對照見 [`analysis-dimensions.md`](./analysis-dimensions.md) §13.2。
+- **這是人工確認過的種子資料，不是每日同步的鏡像**——「代號 → 名稱」沒有官方對照端點，「名稱 → 類指數」更是純人工比對（不是字串規則：「化學工業→化學類指數」要去掉「工業」，「紡織纖維→紡織纖維類指數」直接加）。
+- ⚠️ **`industry_index_name` 是字串比對的鍵**，MI_INDEX 只給名稱沒有代號。**指數改名會讓對照默默失效**，而失效的表現是「這一維不可用」——看起來像資料還沒累積夠，不像設定壞了。**因此盤後排程必須斷言：每一個非 NULL 的 `industry_index_name` 都能在當日 `market_index_daily` 找到一列。**
+
+### `market_index_daily`
+
+參考資料，全域共用，不帶 `user_id`。[#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) 新增，來源 TWSE OpenAPI `MI_INDEX`。
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `index_name` | `text` | 指數名稱，**原樣存 TWSE 的中文字串** |
+| `trade_date` | `date` | 由 MI_INDEX 的民國日期轉西元 |
+| `close_index` | `numeric(20,8)` | 收盤指數 |
+| `change_point` | `numeric(20,8)` | **帶正負號**的漲跌點數。⚠️ 見下 |
+| `change_pct` | `numeric(10,4)` | 漲跌百分比（來源已帶正負號） |
+| `special_note` | `text` | 特殊處理註記，原樣保留 |
+| `source` | `text` | `twse_openapi_MI_INDEX` |
+
+- PK `(index_name, trade_date)`；INDEX `(trade_date)`
+- **存全部 267 列，不是只存 37 檔類指數**：MI_INDEX **只給最新一日**，今天沒存的明天永遠補不回來（歷史端點在禁爬側）。這與 `daily_close` 根本不同——後者的缺列可以用 FinMind 回補，**本表不行**。6.5 萬列/年可忽略，而「當初沒存」是不可逆的。
+- ⚠️ **最容易靜默出錯的一點：來源的 `漲跌點數` 是無正負號的絕對值，正負號在另一個欄位 `漲跌`（`"+"` / `"-"`），而 `漲跌百分比` 自己帶號**——同一列裡兩種慣例。直接存 `漲跌點數` 會讓**所有下跌日變成上漲日**，而因為 `close_index` 是對的，**指數走勢圖上完全看不出來**。寫入時必須換算並斷言 `sign(change_point) == sign(change_pct)`。
+- ⚠️ **本表的排程比其他排程多一條規則**：其他排程的語意是「回補到最新交易日」，**但本端點只給最新一日，回補做不到**。漏跑一天就是永久缺一天，而它的表現是「產業比較不可用」——**看起來像還在累積，不像漏跑**。因此排程必須比對本表與 `benchmark_series` 的最新交易日，**中間有斷點就明確告警**，畫面上也要把「還在累積」與「中間漏了 N 天」分成兩句不同的話。
+- **為什麼不塞進 `benchmark_series`**：那張表被 [`performance.md`](./performance.md) §2.2 當作**台股交易日曆**的來源，混進幾百檔指數後，任何忘記寫 `WHERE benchmark_code = 'TAIEX_TR'` 的查詢**仍會回傳一組合法的日期**——漏寫不報錯。且兩者覆蓋範圍不同（`benchmark_series` 有 2003 起的歷史，本表從部署當天才開始長），混在一起的跨年度查詢會**部分有值、部分沒有，而且看起來完全正常**。
+- **為什麼不塞進 `daily_close`**：它的不變量是「每一列都是一支**可持有標的**的價格」，指數不可持有。這與本文為 `benchmark_series` 拒絕過的是同一個理由。
 
 ### `alert`
 | 欄位 | 型別 | 說明 |
@@ -344,5 +384,5 @@
 - 認證流程的完整規格（provider 接法、逃生階梯、cookie 屬性） → [`auth.md`](./auth.md)
 - ~~費用與稅欄位的計算規則~~ → **已由 [#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 補齊**，見 [`transaction-input.md`](./transaction-input.md) §2（含元以下進位規則，由實際對帳單反推）
 - ~~`alert.condition` 的具體結構~~ → **已由 [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 補齊**，見 [`alerts.md`](./alerts.md)（改具名欄位、新增 `alert_state`、`notification` 補四欄、`daily_close` 擴充為日 OHLCV）
-- ~~個股分析結果要不要落地快取~~ → **已由 [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) 答畢：v1 不落地快取，每次開頁即時算。** 不需要新增資料表，見 [`analysis-dimensions.md`](./analysis-dimensions.md) §4
+- ~~個股分析結果要不要落地快取~~ → **已由 [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) 答畢：v1 不落地快取，每次開頁即時算，不需要分析結果快取表**（見 [`analysis-dimensions.md`](./analysis-dimensions.md) §4）。⚠️ **但「不需要新增資料表」只對「分析結果」成立，對「分析所需的輸入資料」不成立**——「產業比較」這一維需要 `instrument.industry_code` 一欄與 `industry_category`、`market_index_daily` 兩張表，皆已補入本文
 - ~~績效演算法（TWR / XIRR）需要哪些額外欄位~~ → **已由 [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 答畢：一欄都不用加。** TWR 與 XIRR 的輸入全部來自既有的 `transaction` + `daily_close` + `exchange_rate`。唯一的變動是 `CASH_DIVIDEND` 的 `tax` 欄語意（見上）與 `portfolio_snapshot` 的確定不做。詳見 [`performance.md`](./performance.md)

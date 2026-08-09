@@ -302,7 +302,7 @@ v1 用 17 的理由不是「18 不好」，而是**這個專案的所有既有�
 | **WSL2 喚起** | 登入時 | 把發行版叫起來（`systemd` 隨之啟動 tailscaled 與 Docker）。**§1.1 已說明：漏掉這項，以下全部不會跑** |
 | `quote-worker` 開機 | 交易日 09:00 | `docker compose --profile intraday up -d` |
 | `quote-worker` 關機 | 交易日 13:35 | `docker compose --profile intraday stop` |
-| **盤後批次**（**單一任務，內含九個步驟**） | 每日 22:00 之後 | ① `daily_close` 回補 ② `benchmark_series` 回補 ③ `exchange_rate` 回補 ④ **除權息預告 → `pending_action` + `EX_DIVIDEND_AHEAD` 提醒** ⑤ **除權息參考價 → `peak_price` 調整** ⑥ **分割／減資偵測 → `pending_action`** ⑦ **成交量異常評估** ⑧ **產業類指數（`MI_INDEX`）每日快照** ⑨ **美股 `daily_close`（走 yfinance）** ⑩ 每日總結 Discord（14:00 前那則除外，見 [`alerts.md`](./alerts.md) §5） |
+| **盤後批次**（**單一任務，內含九個步驟**） | 每日 22:00 之後 | ① `daily_close` 回補 ② `benchmark_series` 回補 ③ `exchange_rate` 回補 ④ **除權息預告 → `pending_action` + `EX_DIVIDEND_AHEAD` 提醒** ⑤ **除權息參考價 → `peak_price` 調整** ⑥ **分割／減資偵測 → `pending_action`** ⑦ **成交量異常評估** ⑧ **`MI_INDEX` 每日快照 → `market_index_daily`（⚠️ 這一步補不回來，見下）** ⑨ **美股 `daily_close`（走 yfinance）** ⑩ 每日總結 Discord（14:00 前那則除外，見 [`alerts.md`](./alerts.md) §5） |
 | 備份 | 每日，盤後批次之後 | `pg_dump`（§3.3） |
 
 > **十個步驟為什麼是一個排程而不是十個**：它們共用同一個「回補到最新交易日」的游標，而**拆開之後每一個都要各自記住自己補到哪一天**——那是十份可以各自落後的狀態。合成一個之後，心跳只要看一個成功訊號（§5.2）。
@@ -312,6 +312,10 @@ v1 用 17 的理由不是「18 不好」，而是**這個專案的所有既有�
 > ⚠️ **這張清單是 2026-08-09 由 [#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 的冷讀驗收補齊的**：④⑤⑦⑧ 四項分別由 [`alerts.md`](./alerts.md) §11 與 [`analysis-dimensions.md`](./analysis-dimensions.md) 明文交辦給 #17，⑥ 由 [`corporate-actions.md`](./corporate-actions.md) 交辦，而本文初版的清單**一項都沒有列**。交辦後沒人接的排程，就是一個永遠不會被實作的排程。
 >
 > **步驟之間的失敗處理**：任一步驟失敗即整批標記失敗（打 `/fail`），**已成功的步驟不回滾**——它們都是冪等的回補，下次跑會補上。**不得因為某一步失敗就跳過後面的步驟**，否則一個長期壞掉的除權息來源會連帶讓收盤價也永遠不更新。
+>
+> ⚠️ **步驟 ⑧ 是這張清單裡唯一一個「回補做不到」的**。`MI_INDEX` 官方只給最新一日，歷史端點在禁爬側——**漏跑一天就是永久缺一天**，而它的表現是「產業比較不可用」，看起來像資料還在累積、不像漏跑。因此它比其他步驟多一條規則：**比對 `market_index_daily` 與 `benchmark_series` 的最新交易日，中間有斷點就明確告警**。詳見 [`data-model.md`](./data-model.md) `market_index_daily`。
+>
+> **這一步同時是 §4.1「回補式」硬性規則的唯一例外，而例外必須被寫下來**——否則實作者會照著規則把它寫成回補式，然後在一個永遠補不到東西的迴圈裡以為自己補好了。
 
 > 盤後批次的時點：`tw-benchmark-and-fx-sources.md` 目前**只有一個樣本**（T+13.75h 時已有當日資料），保守下界取 **22:00**。精確時點需在盤後 15:00 / 17:00 / 19:00 / 22:00 分別取樣，見 §14。
 
