@@ -18,6 +18,7 @@
 | 1 | [`../../CONTEXT.md`](../../CONTEXT.md) | **詞彙表。** 所有文件用的名詞在這裡定義，包含「刻意避免的講法」。用了衝突的講法要當場提出 |
 | 2 | [`data-model.md`](./data-model.md) | **領域模型與資料表綱要。** 其他每一份文件都在講「怎麼把東西寫進這些表、怎麼從這些表推導出來」 |
 | 3 | [`tech-stack.md`](./tech-stack.md) | **技術選型與 repo 結構。** 決定了程式碼放哪、用什麼寫、怎麼測 |
+| 4 | [`implementation-plan.md`](./implementation-plan.md) | **從哪張票開始做。** 十階段的工作票與順序，每張票標明它會撞到哪幾條「不報錯」的規則 |
 
 **最重要的一句話**（`data-model.md`）：**Transaction 是唯一的事實來源**。Position、成本、損益、歷史曲線全都是推導值，一律不落地。
 
@@ -49,7 +50,13 @@
 
 | 文件 | 內容 | 票 |
 |---|---|---|
-| [`dashboard-ui.md`](./dashboard-ui.md) | 側欄 + 單頁三層、顏色只保留給價格方向、連線三態、tick 用細直條、交易明細依市場拆表 | [#11](https://github.com/NTUyu016/stock-analytic-platform/issues/11) |
+| [`dashboard-ui.md`](./dashboard-ui.md) | **§0 站台頁面與路由清單**、側欄 + 單頁三層、顏色只保留給價格方向、連線三態、tick 用細直條、交易明細依市場拆表 | [#11](https://github.com/NTUyu016/stock-analytic-platform/issues/11) |
+
+### 交付與實作
+
+| 文件 | 內容 | 票 |
+|---|---|---|
+| [`implementation-plan.md`](./implementation-plan.md) | **十階段的工作票與順序。** 錢的計算排最前面，因為後面所有畫面都在顯示它算出來的數字 | [#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) |
 
 ### 支援材料（不是規格，不可據以實作）
 
@@ -80,6 +87,9 @@
 | 12 | **Quote 的量必須是當日累積量，不是單筆量** | `realtime-quotes.md` | 用單筆量會讓 conflation 默默弄丟成交量 |
 | 13 | **退避計數必須穩定 60 秒才重置** | `realtime-quotes.md` | 連上即重置會讓 flapping 時退避完全失效——那正是導致帳號停權的路徑 |
 | 14 | **`pg_dump` 的輸出是個人財務資訊，不得進 repo 或任何公開位置** | `deployment.md` §3.4 | 本 repo 為 public |
+| 15 | **`SPLIT` 只存 `ratio`、不存股數增減量**；部位推導是**比率縮放的**不等式聚合 | `corporate-actions.md` §1.5 | 存 delta 等於把分割變成快照，補登舊交易時它永遠不會被修正 |
+| 16 | **容器一律 `TZ=UTC`，所有「哪一天」顯式換算到 `Asia/Taipei`** | `deployment.md` §4.2.1 | 依賴行程預設時區時，漏設的後果是台股 09:00 前的 8 小時全部算成前一天且不報錯 |
+| 17 | **額度判斷一律 slot 對 slot**，`src/core/` 不得自行把 slot 換算成檔數 | `realtime-quotes.md` §2 | Fugle 的 5 是「標的×頻道」配對，拿檔數比會算出「沒問題」然後被 provider 拒絕 |
 
 ---
 
@@ -87,9 +97,9 @@
 
 這個問題在整張地圖上被問了幾十次，答案幾乎都是**沒有**。三份文件各有一個集中列表，實作時當檢查清單用：
 
-- [`performance.md`](./performance.md) **§8「七個會靜默出錯的地方」** 與 **§8A「十一條必須寫成測試的不變量」**
-- [`deployment.md`](./deployment.md) **§12「會靜默出錯的地方」**（十條）
-- [`corporate-actions.md`](./corporate-actions.md) **§8「必須寫成測試的條目」**（十二條）
+- [`performance.md`](./performance.md) **§8「會靜默出錯的地方」**（標題寫「七個」，實際是 §8.0–§8.6 **七小節**，其中 §8.0 是底層機制、§8.1–§8.6 是六個情境）與 **§8A「十一條必須寫成測試的不變量」**
+- [`deployment.md`](./deployment.md) **§12「會靜默出錯的地方」**（**十五條**）
+- [`corporate-actions.md`](./corporate-actions.md) **§8「必須寫成測試的條目」**（**十六條**）
 
 ---
 

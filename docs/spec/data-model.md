@@ -300,6 +300,45 @@
 | `quote`（即時報價） | 具時效性，落地無價值且量大。活在記憶體與快取中。 |
 | `portfolio_snapshot` | 歷史資產曲線由 Transaction + `daily_close` + `exchange_rate` 重算。存快照就無法在修正舊交易後自動修正歷史。**[#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 已評估完畢：v1 確定不加，連快取形式都不加。** 兩個理由——（1）拖曳選取區間操作的是瀏覽器裡已載入的序列，**不打後端**，`dashboard-ui.md` §7 對 60fps 的顧慮不成立；（2）資料量本來就小。解除條件見 [`performance.md`](./performance.md) §1.4。 |
 
+## 綱要層級的通用規則（[#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 於 2026-08-09 補）
+
+> 冷讀驗收指出：上面的表只給了欄位與型別，**沒有 nullability、沒有 FK 的 `ON DELETE`、沒有分型別的欄位約束**，而 [`implementation-plan.md`](./implementation-plan.md) 票 0.4 要求「所有 `CHECK` 都要寫」。以下把散在各表的通用規則集中成可直接照做的形式。
+
+### N1. Nullability 的預設
+
+**除非上表的說明欄明寫「可為空」／`NULL`，否則一律 `NOT NULL`。** 這個方向是刻意的：`NOT NULL` 寫錯會在第一次 `INSERT` 就爆，而漏寫 `NOT NULL` 的後果是半年後某個 `SUM()` 靜靜跳過那一列（`performance.md` §8.0 已實測過這個機制）。
+
+### N2. `ON DELETE` 一律 `RESTRICT`，且 v1 不做實體刪除
+
+| 情境 | 做法 |
+|---|---|
+| 標的不再持有 | `instrument.is_active = false`（既有的軟刪除） |
+| 規則不要了 | `alert.is_deleted = true`（既有的軟刪除） |
+| 交易輸入錯了 | **沖銷**（再輸一筆反向的），不 `DELETE` |
+| 使用者要移除 | v1 不支援 |
+
+**為什麼是 `RESTRICT` 而不是 `CASCADE`**：`CASCADE` 在這個資料模型上等於「刪一個 Portfolio 會靜靜帶走它底下所有交易紀錄」，而 Transaction 是**唯一事實來源**——它沒有第二份。`RESTRICT` 讓那個操作在資料庫層直接失敗，而失敗是這裡唯一正確的行為。
+
+**唯二的例外**（1:1 從屬、且可完全重建）：`alert_state.alert_id` 與 `session.user_id` 可用 `CASCADE`。判準是「刪掉它會不會失去任何無法重算的東西」。
+
+### N3. 分型別的欄位約束
+
+`transaction` 各型別的必填欄位（語意見上方「各類型的欄位語意」）必須寫成 `CHECK`，不可只靠應用層：
+
+| `type` | 必須有值 | 必須為 NULL |
+|---|---|---|
+| `BUY` / `SELL` | `quantity`, `price` | `cash_amount` |
+| `CASH_DIVIDEND` | `cash_amount` | `quantity`, `price`, `ratio` |
+| `STOCK_DIVIDEND` | `quantity` | `price`, `cash_amount`, `ratio` |
+| `SPLIT` | `ratio` | `quantity`, `price`, `cash_amount` |
+| `ADJUSTMENT` | `note` | `ratio` |
+
+> **`ADJUSTMENT` 是刻意最寬鬆的那一列**——它是逃生門，`quantity` 與 `cash_amount` 可正可負也可缺。但 `note` 必填這一條不放寬：一筆沒有原因的 `ADJUSTMENT` 在半年後與資料錯誤無法區分。
+
+### N4. 金額與數量一律 `numeric`，顯示路徑才可以是 `float8`
+
+已散見於 `performance.md`，在此明文化：**任何進入成本、損益、報酬率、股數計算的值都是 `numeric`**。`float8` 只允許出現在「送去畫圖」的路徑上。這條連 §1.5 的分割比率乘積也適用（`corporate-actions.md` §1.5 明文禁止 `exp(sum(ln()))`）。
+
 ## 已知待補
 
 - 認證流程的完整規格（provider 接法、逃生階梯、cookie 屬性） → [`auth.md`](./auth.md)

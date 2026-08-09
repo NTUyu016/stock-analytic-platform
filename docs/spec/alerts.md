@@ -85,7 +85,15 @@
 - `TRAILING_STOP` 的峰值**重置**（§4）
 - 兩者的規則**自動轉為停用**並在面板上標示原因，**不可靜默保留**
 
-一條算不出值的規則若還顯示為啟用中，就是 `dashboard-ui.md` §3「永遠亮著等於沒有」的變形。
+> ### ⚠️ 2026-08-09 由 [#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 補：「自動轉為停用」寫在哪一欄
+>
+> 冷讀驗收指出這條規則**沒有落腳處**：`CONTEXT.md` 明訂「武裝與否是 Alert 的運行狀態，**使用者設的是 `is_enabled`**」，系統去改 `is_enabled` 等於覆寫使用者意圖（而且使用者重新建倉後不會自動恢復）；`alert_state` 當時又沒有可放的欄位。
+>
+> **決定：`alert_state` 新增 `suspended_reason text NULL`**（NULL = 未暫停），系統寫、使用者不碰。放在 `alert_state` 而不是 `alert` 的理由與 §2.2 相同——**它可以從 `transaction` + `pending_action` 完全重算**，不是持久事實。
+>
+> 這一欄有兩個填值來源，**兩者是同一件事的兩種成因**：本節的「股數歸零」，以及 [`corporate-actions.md`](./corporate-actions.md) §2.4 的「未確認且會改變股數的 `pending_action`」。
+
+一條算不出值的規則若還顯示為啟用中，就是 `dashboard-ui.md` §3 那條原則（原文：「非交易時段用警告色會讓使用者學會忽略它」，即**永遠亮著等於沒有**）的變形。
 
 ---
 
@@ -98,7 +106,8 @@
 | `id` | `bigserial` PK | |
 | `user_id` | `bigint` FK NOT NULL | |
 | `instrument_id` | `bigint` FK NOT NULL | |
-| `rule_type` | `text` NOT NULL | §1 的六種之一，`CHECK (rule_type IN (...))` |
+| `portfolio_id` | `bigint` FK NULL | **類型 3／4（依部位）必須有值，其餘必須為 NULL**（[#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 補）。`CONTEXT.md` 明訂同一支標的在不同 Portfolio 是兩個各自獨立計算成本的 Position，沒有這一欄就算不出「未實現報酬率」是哪一個部位的 |
+| `rule_type` | `text` NOT NULL | §1 的六**類**、展開為**九個列舉值**，`CHECK (rule_type IN (...))`。⚠️ 列舉寫九個不是六個 |
 | `threshold` | `numeric(20,8)` NOT NULL | 語意隨 `rule_type` 而異，見 §1 |
 | `is_enabled` | `boolean` NOT NULL DEFAULT true | |
 | `is_deleted` | `boolean` NOT NULL DEFAULT false | **軟刪除**，沿用 `instrument.is_active` 先例 |
@@ -129,6 +138,7 @@
 | `last_triggered_at` | `timestamptz` NULL | |
 | `peak_price` | `numeric(20,8)` NULL | 僅 `TRAILING_STOP`，見 §4 |
 | `peak_since` | `date` NULL | 僅 `TRAILING_STOP`，峰值起算日（建倉日） |
+| `suspended_reason` | `text` NULL | **系統暫停評估的原因**；NULL = 未暫停（[#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 補，見 §1） |
 | `updated_at` | `timestamptz` NOT NULL | |
 
 #### 為什麼分成兩張表
@@ -161,6 +171,25 @@
 2. **投遞狀態**：[#7](https://github.com/NTUyu016/stock-analytic-platform/issues/7) §8.3 明確要求。
    > ⚠️ 這與 [#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 拒絕 `transaction.status` **不衝突**：`transaction` 是事實來源，加 `status` 會讓所有既有查詢必須記得過濾；`notification` 記的就是「一次投遞嘗試」，狀態是它的本質屬性。
 3. **不設保留期限**：5–10 條規則的量級一年也就幾百列，加一個清理排程的維護成本高於它省下的空間。
+
+> ### ⚠️ 2026-08-09 由 [#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 補：沒有 outbox，那 `PENDING` 與 `attempts` 是誰在動？
+>
+> 冷讀驗收指出這兩件事看起來互相矛盾：§7 定「v1 不做 outbox，worker 評估後**直接送出**」，但這張表有 `PENDING` 狀態與 `attempts` 計數，而**誰重試、重試幾次、退避多久**沒有規定。
+>
+> **決定：重試發生在同一次送出的行程內，且上限很低。**
+>
+> | 規則 | 值 |
+> |---|---|
+> | `PENDING` 的意義 | **「已寫入紀錄、尚未送出」的那幾百毫秒**，不是佇列 |
+> | 重試次數 | **最多 2 次**（合計 3 次嘗試） |
+> | 退避 | 1s → 3s，固定，不加 jitter（量級太小，不值得） |
+> | 三次都失敗 | 標 `FAILED`，**不排隊、不補送** |
+> | HTTP 404 | **立即 `ABANDONED`，不重試**（既有規則，webhook 已被刪除） |
+> | HTTP 429 | 讀 `Retry-After` 標頭，**不硬編碼等待時間**（既有規則） |
+>
+> **為什麼失敗就放棄，不做補送**：`alerts.md` §7 已定送達時限是「盤中 ≤30 分鐘」。**一則遲到兩小時的價格警示不只是沒用，是有害的**——使用者會依它做判斷，而那個價格早就不在了。這與 [`deployment.md`](./deployment.md) §5.2 拒絕把心跳 grace 調寬是同一條理由：**過期的通知比沒有通知更糟。**
+>
+> **`FAILED` 不是死路**：站內通知列表讀的是 `notification` 表本身，與 Discord 是否送成功無關。使用者下次開網站仍看得到那則警示——**站內是基礎層，Discord 是即時層**（[#7](https://github.com/NTUyu016/stock-analytic-platform/issues/7) 的既有分層）。
 
 ### 2.4 `daily_close` 擴充為日 OHLCV
 
@@ -477,7 +506,7 @@ Discord [Developer Policy](https://discord.com/developers/docs/policies-and-agre
 
 警示與即時報價綁在同一個開關上。worker 未開機時，面板頂端的狀態指示**必須明確顯示警示未運作**，且所有盤中規則不得顯示為「武裝中」。
 
-> 「以為有人幫你看盤、其實沒有」比「知道自己沒有警示」危險得多，因為使用者會**依賴它而不自己看**。這是 [`realtime-quotes.md`](./realtime-quotes.md) §5「前提破了就明確停下來告訴人」與 [`dashboard-ui.md`](./dashboard-ui.md) §3「永遠亮著等於沒有」兩條既有原則的交集。
+> 「以為有人幫你看盤、其實沒有」比「知道自己沒有警示」危險得多，因為使用者會**依賴它而不自己看**。這是 [`realtime-quotes.md`](./realtime-quotes.md) §5「前提破了就明確停下來告訴人」與 [`dashboard-ui.md`](./dashboard-ui.md) §3 的警告色原則（**永遠亮著等於沒有**；同一條原則在 [`transaction-input.md`](./transaction-input.md) §9 被引用過兩次）兩條既有原則的交集。
 
 盤後規則（成交量異常、除權息提醒）不受影響，應與盤中規則在視覺上分區，否則使用者無從判斷哪些還活著。
 

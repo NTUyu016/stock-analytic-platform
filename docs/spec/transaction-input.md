@@ -157,7 +157,7 @@ CSV 匯入是 v1 的主力路徑。手動表單存在，但它的職責是**匯�
 | 欄位 | 必填 | 說明 |
 |---|---|---|
 | `traded_on` | ✅ | `YYYY-MM-DD` |
-| `type` | ✅ | `BUY` / `SELL` / `CASH_DIVIDEND` / `STOCK_DIVIDEND` / `ADJUSTMENT` |
+| `type` | ✅ | `BUY` / `SELL` / `CASH_DIVIDEND` / `STOCK_DIVIDEND` / **`SPLIT`** / `ADJUSTMENT` |
 | `symbol` | ✅ | 標的代號。**用代號不用中文名** |
 | `market` | | 省略時由 `symbol` 反查；跨市場撞號則中斷 |
 | `quantity` | 依 `type` | |
@@ -166,10 +166,17 @@ CSV 匯入是 v1 的主力路徑。手動表單存在，但它的職責是**匯�
 | `tax` | | 同上 |
 | `cash_amount` | 依 `type` | `CASH_DIVIDEND` 用 |
 | `currency` | | 省略時取自標的 |
+| `ratio` | `SPLIT` 必填 | **分割比率**（1 拆 4 為 `4`、4 合 1 為 `0.25`）。⚠️ **`SPLIT` 的 `quantity` 必須留空**，見下 |
 | `external_ref` | | 有值則參與去重；空白則每次匯入都視為新列 |
 | `note` | `ADJUSTMENT` 必填 | |
 
 **`fee`／`tax` 空白視為 0 但要警告**，是因為「確定沒有費用」與「不知道費用」在數值上無法區分，而後者會讓成本基礎偏低。系統不猜，但也不能讓它無聲通過。
+
+> ### ⚠️ 2026-08-09 由 [#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) + [#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 補上 `SPLIT`
+>
+> 這一格是冷讀驗收撈出來的：#20 把 `SPLIT` 定成第一類型別，但本節的枚舉沒跟著改，於是**中性 CSV 表達不出分割**。而那正好卡住一條真實路徑——[`corporate-actions.md`](../spec/corporate-actions.md) §4.4 已定自動偵測的**回溯下限只到 2019-09-09**，更早的分割「必須人工補」，**而人工補的唯一入口就是這個格式**。
+>
+> `SPLIT` 列**只填 `ratio`、不填 `quantity`**（填了會被 `CHECK (type <> 'SPLIT' OR quantity IS NULL)` 擋下並中斷整份匯入）。理由見 `corporate-actions.md` §1.5：存股數增減量等於把分割變成快照，補登舊交易時它永遠不會被修正。
 
 ---
 
@@ -183,6 +190,16 @@ CSV 匯入是 v1 的主力路徑。手動表單存在，但它的職責是**匯�
 2. 未命中 → 打官方 OpenAPI 反查
 3. 唯一命中 → 自動建立 `instrument` 與對照，繼續
 4. **查無或多筆命中 → 中斷整批匯入**，列出待指定的名稱
+
+> ### ⚠️ 2026-08-09 由 [#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 補：第 3 步的 `instrument_type` **不得自動決定**
+>
+> 冷讀驗收指出：`instrument_type`（`STOCK` / `ETF`）決定證交稅是 **0.3% 還是 0.1%，差三倍**，而本節的兩個反查端點**都不提供這個旗標**——原文只寫「自動建立 `instrument`」，沒說這一欄從哪來。**猜錯不會報錯**，它只會讓每一筆賣出的稅少算或多算三倍。
+>
+> **決定：自動反查只產生「建議值」，`instrument_type` 必須由使用者在中斷畫面上確認一次才落地。** 建議值可依代號規則預填（台股 ETF 慣例為 `00` 開頭），但**代號規則是慣例不是規範**，不得當成事實。
+>
+> 這與本節既有的立場一致：**看不懂的東西中斷問人，不猜**。確認過一次之後該標的進對照表，往後不再問。
+>
+> ⚠️ **另有一個現行三值列舉表達不出來的情況**：[`tw-trading-costs-taxes.md`](../research/tw-trading-costs-taxes.md) 記載**債券 ETF／公司債的證交稅停徵至 2026-12-31**（今年底就撞到），那是**第三種稅別**。v1 使用者無此類持股，故不擴充列舉，但**稅率查表必須以 `(instrument_type, traded_on)` 為鍵**（費率不得硬編碼，#6），日後加一個列舉值時不必動計算邏輯。
 
 ### 為什麼對照表優先於 API，而不是反過來
 
@@ -231,6 +248,14 @@ API 回的是**今日快照**（[#3](https://github.com/NTUyu016/stock-analytic-
 - 重複匯入同一份檔案 → 自然鍵已存在的列**靜默跳過**
 - 自然鍵相同但數值不同 → **視為衝突，中斷並列出差異**，不覆寫
 - 與**無 `external_ref` 的手動列**疑似重複 → **只提示，由使用者逐筆決定**
+
+> ### `pending_action.kind = 'IMPORT_CONFLICT'` 對應的是哪一種（[#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 於 2026-08-09 釐清）
+>
+> 冷讀驗收問：既然匯入是「全成功或全不進」、衝突一律中斷，那什麼情況會產生一列 `IMPORT_CONFLICT`？
+>
+> **答案是上面第四項，而且只有第四項**：「與手動列疑似重複」是唯一**不中斷**的情況——它讓匯入照常完成，把「這兩筆是不是同一筆」留給使用者事後逐筆決定，而那個待辦就是一列 `IMPORT_CONFLICT`。
+>
+> 前三項（自然鍵已存在、數值不同、反查失敗）**都不會產生 `pending_action`**：前者靜默跳過，後兩者中斷整批匯入、什麼都不落地。**中斷的東西不留待辦——因為根本沒有東西進來。**
 
 ### 為什麼鍵裡要有日期
 

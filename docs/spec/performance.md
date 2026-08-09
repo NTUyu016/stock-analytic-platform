@@ -580,7 +580,9 @@ PK `(benchmark_code, trade_date)`。
 
 ## 7. 圖表
 
-四張圖全部由**同一次每日重算**的結果推導。但它們不是均勻地便宜——實測 payload（10 年 2,514 點，gzip，見 [`../briefing/16-performance.md`](../briefing/16-performance.md) §7.2）：
+四張圖全部由**同一次每日重算**的結果推導。
+
+> ⚠️ **2026-08-09 由 [#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 釐清一處數不對的地方**：本節有 **§7.1–§7.5 五個子節**，但正文兩處都寫「四張圖」。**「四張」指的是 §7.2–§7.5**——那是使用者當初從選單裡全選的四張**新增**圖表；**§7.1 總資產曲線是儀表板本來就有的主圖**（[`dashboard-ui.md`](./dashboard-ui.md) §7 已定義其互動），不在那次選擇的範圍內。**五個子節全部都在 v1 範圍內**，沒有一個是備選。但它們不是均勻地便宜——實測 payload（10 年 2,514 點，gzip，見 [`../briefing/16-performance.md`](../briefing/16-performance.md) §7.2）：
 
 | 圖 | 需要的資料 | gzip payload |
 |---|---|---:|

@@ -158,7 +158,7 @@ new_peak = old_peak / ratio
 
 ### 2.3 這填的是 #15 明文留下的缺口
 
-`alerts.md` §4 已記錄：除權息的峰值調整走 `TaiwanStockDividendResult` 的 `reference_price / before_price`，而**分割在 `TaiwanStockSplitPrice`，是另一個 dataset，走不到那條路徑**，並明寫「本規格暫不修改，型別與調整規則另開票處理」。
+`alerts.md` §4 原本記錄：除權息的峰值調整走 `TaiwanStockDividendResult` 的 `reference_price / before_price`，而**分割在 `TaiwanStockSplitPrice`，是另一個 dataset，走不到那條路徑**，並明寫「本規格暫不修改，型別與調整規則另開票處理」。**本票定案後，`alerts.md` §4 的那段缺口標記已被本節的結論取代**，故該處現在讀到的是答案而不是缺口。
 
 失效模式 #15 已經用真實數據驗證過，**與除權息完全同形**：峰值停在 188.65 而股價已是 47.57，規則**永久黏在「已觸發」且不報錯**。
 
