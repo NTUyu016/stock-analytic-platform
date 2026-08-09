@@ -99,7 +99,7 @@
 | `user_id` | `bigint` FK | 冗餘欄位，供查詢時免 join portfolio |
 | `portfolio_id` | `bigint` FK | |
 | `instrument_id` | `bigint` FK | |
-| `type` | `text` | `BUY` / `SELL` / `CASH_DIVIDEND` / `STOCK_DIVIDEND` / `ADJUSTMENT` |
+| `type` | `text` | `BUY` / `SELL` / `CASH_DIVIDEND` / `STOCK_DIVIDEND` / **`SPLIT`** / `ADJUSTMENT`。**必須有 `CHECK` 列舉約束**（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20)） |
 | `traded_on` | `date` | 成交日 |
 | `quantity` | `numeric(20,8)` | 股數。`numeric` 而非整數：零股、加密貨幣、股票股利配發都會有小數 |
 | `price` | `numeric(20,8)` | 每股價格，原幣別 |
@@ -107,6 +107,7 @@
 | `tax` | `numeric(20,4)` | 證交稅 |
 | `cash_amount` | `numeric(20,4)` | 現金股利總額（`CASH_DIVIDEND` 用） |
 | `currency` | `char(3)` | 冗餘自 instrument，凍結交易當下的幣別 |
+| `ratio` | `numeric(20,8)` | **分割比率**（`SPLIT` 專用）。`新股數 = 舊股數 × ratio`；1 拆 4 為 `4`、4 合 1 為 `0.25`（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20)） |
 | `note` | `text` | `ADJUSTMENT` 必填原因 |
 | `external_ref` | `text` | 匯入來源的自然鍵。可為空（手動輸入） |
 | `created_at` | `timestamptz` | |
@@ -119,7 +120,16 @@
   - `BUY` / `SELL`：`quantity` + `price` + `fee` + `tax`（此處 `tax` 為證交稅）
   - `CASH_DIVIDEND`：`cash_amount`（宣告**總額**）+ `tax`（配息當下扣掉的**補充保費／就源扣繳**）。不改股數，**不改成本基礎**。實收淨額 = `cash_amount` − `tax`
   - `STOCK_DIVIDEND`：只有 `quantity`，總成本不變 → 均價被稀釋
-  - `ADJUSTMENT`：`quantity` 與 `cash_amount` 可正可負，`note` 必填
+  - `SPLIT`：只有 `quantity`（股數增減量）與 `ratio`。**無現金流、總成本基礎不變**。涵蓋分割／反分割／面額變更三種公告類型（三者共用同一條 TWSE 公式），**不涵蓋減資**
+  - `ADJUSTMENT`：`quantity` 與 `cash_amount` 可正可負，`note` 必填。減資、換股、合併走這裡
+
+> **[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 新增的硬性約束**：
+> ```sql
+> CHECK ((type = 'SPLIT') = (ratio IS NOT NULL))
+> ```
+> **必須是雙向等式，不可寫成 `CHECK (type <> 'SPLIT' OR ratio IS NOT NULL)`。** 單向版本允許非 `SPLIT` 的列填入 `ratio`，而那正是 [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) 已識別過的形狀——**`CHECK` 對不該有值的欄位放行，不報錯**。詳見 [`corporate-actions.md`](./corporate-actions.md) §1.4。
+>
+> ⚠️ **`CHECK` 擋不住真正的風險**：它保證沒有非法的 type 值，但擋不住「某段程式碼只枚舉了 `BUY`/`SELL`，忘了 `SPLIT`」。因此規定**所有依 `type` 分支的程式碼必須是窮舉式的**（`match` + `case _: raise`），不得有靜默的 fall-through。
 
 > **[#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 修訂**：`CASH_DIVIDEND` 原記「**降低成本基礎**」，改為**不改成本基礎**、獨立累計為 Dividend Income。
 > 決定性理由不是「跟券商對得上」（那只是好處），而是**沖減成本會靜默翻轉報酬率的正負號** —— 長期持有高殖利率標的時累計股利可超過原始成本，使成本基礎降到零以下，而報酬率 `(市值 − 成本)/成本` 的分母一旦為負，正負號整個翻過來且不報錯。詳見 [`performance.md`](./performance.md) §3。
@@ -236,9 +246,9 @@
 | `user_id` | `bigint` FK | |
 | `kind` | `text` | `CORPORATE_ACTION` / `IMPORT_CONFLICT` |
 | `instrument_id` | `bigint` FK | 可為空 |
-| `effective_on` | `date` | 除權息基準日 |
-| `proposed` | `jsonb` | 系統算出的預填值 |
-| `source` | `text` | 產生來源，如 `twse_TWT48U_ALL` |
+| `effective_on` | `date` | **該事件生效、市場開始以新股數與新價格交易的第一個交易日**（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 改寫；原記「除權息基準日」） |
+| `proposed` | `jsonb` | 系統算出的預填值。**減資場合刻意不含比率**——官方資料源分離不出換股率 |
+| `source` | `text` | 產生來源，如 `twse_TWT48U_ALL`、`finmind_TaiwanStockSplitPrice`。⚠️ **兩者的授權性質不對等**：除權息走政府資料開放授權的官方端點，分割與減資**只有 FinMind 這條路**（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20)） |
 | `created_at` | `timestamptz` | |
 
 - 待使用者確認的項目。**確認後才 INSERT 進 `transaction`，本表列刪除或標記已處理。**

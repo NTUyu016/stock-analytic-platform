@@ -273,7 +273,9 @@ API 回的是**今日快照**（[#3](https://github.com/NTUyu016/stock-analytic-
 | 事件 | 處理 |
 |---|---|
 | **除權息** | 盤後排程比對持有標的與官方預告，命中則產生**待確認項**；使用者確認或修改金額後才寫入 `transaction` |
-| **減資、換股、合併** | 手動 `ADJUSTMENT` |
+| **分割／反分割／面額變更** | ⚠️ **[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 修訂**：改走具名型別 `SPLIT`，**自動偵測且預填比率**。見 [`corporate-actions.md`](./corporate-actions.md) |
+| **減資** | ⚠️ **[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 修訂**：**偵測自動化**（有乾淨資料源），但 `pending_action` **不預填比率**，輸入仍手動 `ADJUSTMENT` |
+| **換股、合併** | 手動 `ADJUSTMENT`（#20 複查後維持） |
 
 ### 為什麼只有除權息自動化
 
@@ -283,7 +285,17 @@ API 回的是**今日快照**（[#3](https://github.com/NTUyu016/stock-analytic-
 2. **有官方資料源** —— 見下
 3. **不做就會靜默出錯** —— 它是**使用者沒做任何動作、但股數與成本自己變了**的事件。CSV 永遠不會提醒你，因為對帳單裡根本沒有這種列（§3 陷阱 8）
 
-減資與換股一年難得一次、沒有乾淨的官方 feed（[#3](https://github.com/NTUyu016/stock-analytic-platform/issues/3) 已將 MOPS 列為不建議程式化存取），而 `CONTEXT.md` 已把 `ADJUSTMENT` 定義為「刻意保留的逃生門」—— 那就讓它當逃生門。
+~~減資與換股一年難得一次、沒有乾淨的官方 feed（[#3](https://github.com/NTUyu016/stock-analytic-platform/issues/3) 已將 MOPS 列為不建議程式化存取），而 `CONTEXT.md` 已把 `ADJUSTMENT` 定義為「刻意保留的逃生門」—— 那就讓它當逃生門。~~
+
+> ### ⚠️ 2026-08-09 由 [#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 更正：上面這句話對減資不成立
+>
+> 查證發現 **FinMind `TaiwanStockCapitalReductionReferencePrice` 免費層可用**，欄位名可逐字對回 TWSE 英文版頁面，實測回溯逾十年——**減資有乾淨的官方 feed**。分割亦然（`TaiwanStockSplitPrice`）。
+>
+> **但結論（手動輸入）不變，理由換成一個更強的**：TWSE 對「退還股款」型減資的公式是 `(停止買賣前收盤價 − 息值 − 每股退還股款) / 減資換股率`，**現金退款被摻在分子裡**，而該 dataset **沒有任何欄位單獨給出換股率或每股退還股款**。實測 2603 陽明 `after/before = 2.3144`，真正的換股率倒數是 **2.5**。
+>
+> 也就是說：**不是沒有 feed，是 feed 給不出重建部位所需的數字**。自動套用會得到一個「看起來已經修好了」但錯的比率，比不做更糟——不做至少會被 §9 的對帳抓到股數不符，錯的自動調整會讓對帳也對得起來。
+>
+> **偵測則自動化**（既然來源乾淨且免費），只是 `pending_action.proposed` 不預填比率，改寫「請依對帳單輸入」。**換股與合併經 FinMind 全清單、TWSE 143 paths、TPEx 225 paths 逐一掃過確認沒有資料源**，該部分的原判斷完全成立。
 
 ### 資料源
 

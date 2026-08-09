@@ -53,11 +53,24 @@ _Avoid_: Account, 帳戶, 帳號, Watchlist
 _Avoid_: Trade, Order, Deal, 委託
 
 **Transaction Type（交易類型）**：
-Transaction 的種類，決定它如何影響股數與成本：`BUY`、`SELL`、`CASH_DIVIDEND`（現金股利）、`STOCK_DIVIDEND`（股票股利）、`ADJUSTMENT`（通用調整）。
+Transaction 的種類，決定它如何影響股數與成本：`BUY`、`SELL`、`CASH_DIVIDEND`（現金股利）、`STOCK_DIVIDEND`（股票股利）、`SPLIT`（分割）、`ADJUSTMENT`（通用調整）。列舉值有資料庫層 `CHECK` 約束（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20)）。
 _Avoid_: Action, Side, 買賣別
 
+**Corporate Action（公司行動）**：
+發行機構所做、會改變持有人手上股數或標的、但**不是買賣**的事件：分割、反分割、面額變更、減資、換股、合併、除權息。本系統依「有沒有乾淨的比率可取得」把它們分成三類處理，見 [`corporate-actions.md`](docs/spec/corporate-actions.md)。
+_Avoid_: 公司事件, Corporate event, 除權除息（那只是其中一種）
+
+**Split（分割）**：
+一種 Transaction Type，涵蓋**分割、反分割、變更股票面額**三種 TWSE 公告類型——它們共用同一條官方公式（`恢復買賣參考價 = 停止買賣前最後收盤價 / 比率`），對本系統而言是同一件事：**依一個比率改變股數，沒有任何現金流，總成本基礎不變**。**減資不屬於此類**（其參考價公式混入現金退款，比率無法分離）。
+_Avoid_: 拆股, 股票分割（漏掉反分割與面額變更）, Stock split
+
+**Split Ratio（分割比率）**：
+`新股數 = 舊股數 × Split Ratio`。1 拆 4 為 `4`，4 合 1 為 `0.25`，面額 10 元改 1 元為 `10`。它是 Transaction 上的**第一類欄位**，不從股數變化量反推，也不直接存官方參考價的浮點商（那只是四捨五入後的近似）。
+_Avoid_: 拆股比例, Split factor, 換股率（那是減資用的另一個詞）
+
 **Adjustment（通用調整）**：
-一種 Transaction Type，直接指定股數與成本的增減並附註原因，用於系統未內建專屬邏輯的公司行動（減資、換股、合併）。它是刻意保留的逃生門，不是資料錯誤的修補工具。
+一種 Transaction Type，直接指定股數與成本的增減並附註原因，用於系統未內建專屬邏輯的公司行動（**減資、換股、合併**）。它是刻意保留的逃生門，不是資料錯誤的修補工具。
+⚠️ **分割自 [#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 起有專屬型別 `SPLIT`，不再走這個逃生門。** 減資雖然**偵測**已自動化，輸入仍走 Adjustment——因為官方資料源給不出重建部位所需的換股率。
 _Avoid_: Correction, Fix, 修正
 
 **Position（部位）**：
@@ -117,7 +130,8 @@ _Avoid_: Upload, 上傳, 同步
 _Avoid_: Import ID, 外部 ID, 交易編號
 
 **Pending Action（待確認項）**：
-系統推測出、但尚未經使用者確認的一筆變動，如自動偵測到的除權息。**它不是 Transaction** —— 只有確認之後才會成為 Transaction。這個區分是刻意的：Transaction 表裡每一列都必須是事實。
+系統推測出、但尚未經使用者確認的一筆變動，如自動偵測到的除權息、分割或減資。**它不是 Transaction** —— 只有確認之後才會成為 Transaction。這個區分是刻意的：Transaction 表裡每一列都必須是事實。
+⚠️ **只要某標的存在「未確認且會改變股數」的 Pending Action，該標的所有依賴股數或峰值的警示規則一律暫停評估並標示原因**（[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20)）——用錯的股數給一個看起來正常的答案，比明說「暫停」更糟。
 _Avoid_: Draft, 草稿, 暫存交易
 
 **Reconciliation（對帳）**：

@@ -1,0 +1,312 @@
+執行時間：2026-08-09 19:06:07
+
+================================================================================================
+### A. TaiwanStockSplitPrice：全歷史 vs 僅最新快照
+================================================================================================
+
+A1. 不帶 data_id、start_date=1990-01-01（全市場、全期間）
+  GET ?dataset=TaiwanStockSplitPrice&start_date=1990-01-01     [#  1] HTTP 200  0.23s rows=32    msg=success
+    {"date": "2019-09-09", "stock_id": "6548", "type": "面額變更", "before_price": 312.0, "after_price": 31.2, "max_price": 34.3, "min_price": 28.1, "open_price": 31.2}
+    {"date": "2020-08-17", "stock_id": "8070", "type": "面額變更", "before_price": 190.0, "after_price": 19.0, "max_price": 20.9, "min_price": 17.1, "open_price": 19.0}
+    {"date": "2021-10-18", "stock_id": "6531", "type": "面額變更", "before_price": 750.0, "after_price": 375.0, "max_price": 412.5, "min_price": 337.5, "open_price": 375.0}
+    {"date": "2022-07-13", "stock_id": "6415", "type": "面額變更", "before_price": 2485.0, "after_price": 621.25, "max_price": 683.0, "min_price": 560.0, "open_price": 621.0}
+    {"date": "2022-08-29", "stock_id": "6613", "type": "面額變更", "before_price": 169.0, "after_price": 84.5, "max_price": 92.9, "min_price": 76.1, "open_price": 84.5}
+    {"date": "2022-09-05", "stock_id": "6548", "type": "面額變更", "before_price": 90.6, "after_price": 36.24, "max_price": 39.85, "min_price": 32.65, "open_price": 36.25}
+    {"date": "2022-09-19", "stock_id": "5536", "type": "面額變更", "before_price": 206.0, "after_price": 103.0, "max_price": 113.0, "min_price": 92.7, "open_price": 103.0}
+    {"date": "2022-12-12", "stock_id": "3093", "type": "面額變更", "before_price": 109.5, "after_price": 27.38, "max_price": 30.1, "min_price": 24.65, "open_price": 27.4}
+    {"date": "2024-09-09", "stock_id": "6763", "type": "面額變更", "before_price": 491.0, "after_price": 49.1, "max_price": 54.0, "min_price": 44.2, "open_price": 49.1}
+    {"date": "2024-09-09", "stock_id": "8932", "type": "面額變更", "before_price": 169.5, "after_price": 84.75, "max_price": 93.2, "min_price": 76.3, "open_price": 84.8}
+    {"date": "2024-11-11", "stock_id": "8476", "type": "面額變更", "before_price": 58.8, "after_price": 29.4, "max_price": 32.3, "min_price": 26.5, "open_price": 29.4}
+    {"date": "2024-12-09", "stock_id": "5278", "type": "面額變更", "before_price": 319.5, "after_price": 31.95, "max_price": 35.1, "min_price": 28.8, "open_price": 31.95}
+    {"date": "2024-12-11", "stock_id": "00632R", "type": "反分割", "before_price": 3.28, "after_price": 22.96, "max_price": 25.25, "min_price": 20.67, "open_price": 22.96}
+    {"date": "2025-02-19", "stock_id": "00676R", "type": "反分割", "before_price": 2.04, "after_price": 12.23, "max_price": 13.45, "min_price": 11.01, "open_price": 12.23}
+    {"date": "2025-03-31", "stock_id": "5314", "type": "面額變更", "before_price": 1390.0, "after_price": 69.5, "max_price": 76.4, "min_price": 62.6, "open_price": 69.5}
+    {"date": "2025-06-11", "stock_id": "00663L", "type": "分割", "before_price": 170.15, "after_price": 24.3, "max_price": 29.16, "min_price": 19.44, "open_price": 24.3}
+    {"date": "2025-06-18", "stock_id": "0050", "type": "分割", "before_price": 188.65, "after_price": 47.16, "max_price": 51.85, "min_price": 42.45, "open_price": 47.16}
+    {"date": "2025-06-30", "stock_id": "4763", "type": "面額變更", "before_price": 885.0, "after_price": 88.5, "max_price": 97.3, "min_price": 79.7, "open_price": 88.5}
+    {"date": "2025-07-21", "stock_id": "6919", "type": "面額變更", "before_price": 1215.0, "after_price": 121.5, "max_price": 133.5, "min_price": 109.5, "open_price": 121.5}
+    {"date": "2025-08-25", "stock_id": "2327", "type": "面額變更", "before_price": 546.0, "after_price": 136.5, "max_price": 150.0, "min_price": 123.0, "open_price": 136.5}
+    {"date": "2025-10-22", "stock_id": "00673R", "type": "反分割", "before_price": 7.02, "after_price": 28.08, "max_price": 9999.95, "min_price": 0.01, "open_price": 28.08}
+    {"date": "2025-10-22", "stock_id": "00706L", "type": "反分割", "before_price": 5.54, "after_price": 22.16, "max_price": 9999.95, "min_price": 0.01, "open_price": 22.16}
+    {"date": "2025-11-17", "stock_id": "8422", "type": "面額變更", "before_price": 250.0, "after_price": 25.0, "max_price": 27.5, "min_price": 22.5, "open_price": 25.0}
+    {"date": "2025-11-26", "stock_id": "0052", "type": "分割", "before_price": 245.3, "after_price": 35.04, "max_price": 38.54, "min_price": 31.54, "open_price": 35.04}
+    {"date": "2025-12-10", "stock_id": "00715L", "type": "反分割", "before_price": 10.43, "after_price": 20.86, "max_price": 9999.95, "min_price": 0.01, "open_price": 20.86}
+    {"date": "2026-01-19", "stock_id": "7780", "type": "面額變更", "before_price": 185.0, "after_price": 18.5, "max_price": 20.35, "min_price": 16.65, "open_price": 18.5}
+    {"date": "2026-03-09", "stock_id": "8932", "type": "面額變更", "before_price": 199.5, "after_price": 99.75, "max_price": 109.5, "min_price": 89.8, "open_price": 99.8}
+    {"date": "2026-03-31", "stock_id": "00631L", "type": "", "before_price": 443.15, "after_price": 20.14, "max_price": 24.16, "min_price": 16.12, "open_price": 20.14}
+    {"date": "2026-04-13", "stock_id": "8937", "type": "面額變更", "before_price": 145.5, "after_price": 36.38, "max_price": 40.0, "min_price": 32.75, "open_price": 36.4}
+    {"date": "2026-04-20", "stock_id": "3086", "type": "面額變更", "before_price": 325.0, "after_price": 32.5, "max_price": 35.75, "min_price": 29.25, "open_price": 32.5}
+    {"date": "2026-04-22", "stock_id": "00674R", "type": "反分割", "before_price": 5.18, "after_price": 25.9, "max_price": 9999.95, "min_price": 0.01, "open_price": 25.9}
+    {"date": "2026-07-07", "stock_id": "00685L", "type": "分割", "before_price": 306.0, "after_price": 12.75, "max_price": 15.3, "min_price": 10.2, "open_price": 12.75}
+
+  日期範圍：2019-09-09 ~ 2026-07-07
+  distinct stock_id：30／總列數 32
+  出現一次以上的 stock_id：{"6548": ["2019-09-09", "2022-09-05"], "8932": ["2024-09-09", "2026-03-09"]}
+  type 值分布：{"面額變更": 21, "反分割": 6, "分割": 4, "": 1}
+  before_price/after_price 比值（>1 代表股數變多）：
+    2019-09-09 6548     面額變更   ratio=10.0000
+    2020-08-17 8070     面額變更   ratio=10.0000
+    2021-10-18 6531     面額變更   ratio=2.0000
+    2022-07-13 6415     面額變更   ratio=4.0000
+    2022-08-29 6613     面額變更   ratio=2.0000
+    2022-09-05 6548     面額變更   ratio=2.5000
+    2022-09-19 5536     面額變更   ratio=2.0000
+    2022-12-12 3093     面額變更   ratio=3.9993
+    2024-09-09 6763     面額變更   ratio=10.0000
+    2024-09-09 8932     面額變更   ratio=2.0000
+    2024-11-11 8476     面額變更   ratio=2.0000
+    2024-12-09 5278     面額變更   ratio=10.0000
+    2024-12-11 00632R   反分割    ratio=0.1429
+    2025-02-19 00676R   反分割    ratio=0.1668
+    2025-03-31 5314     面額變更   ratio=20.0000
+    2025-06-11 00663L   分割     ratio=7.0021
+    2025-06-18 0050     分割     ratio=4.0002
+    2025-06-30 4763     面額變更   ratio=10.0000
+    2025-07-21 6919     面額變更   ratio=10.0000
+    2025-08-25 2327     面額變更   ratio=4.0000
+    2025-10-22 00673R   反分割    ratio=0.2500
+    2025-10-22 00706L   反分割    ratio=0.2500
+    2025-11-17 8422     面額變更   ratio=10.0000
+    2025-11-26 0052     分割     ratio=7.0006
+    2025-12-10 00715L   反分割    ratio=0.5000
+    2026-01-19 7780     面額變更   ratio=10.0000
+    2026-03-09 8932     面額變更   ratio=2.0000
+    2026-03-31 00631L          ratio=22.0035
+    2026-04-13 8937     面額變更   ratio=3.9995
+    2026-04-20 3086     面額變更   ratio=10.0000
+    2026-04-22 00674R   反分割    ratio=0.2000
+    2026-07-07 00685L   分割     ratio=24.0000
+
+A2. 同一標的多列交叉驗證（帶 data_id）
+  data_id=6548                                                 [#  2] HTTP 200  0.06s rows=2     msg=success
+      {"date": "2019-09-09", "stock_id": "6548", "type": "面額變更", "before_price": 312.0, "after_price": 31.2, "max_price": 34.3, "min_price": 28.1, "open_price": 31.2}
+      {"date": "2022-09-05", "stock_id": "6548", "type": "面額變更", "before_price": 90.6, "after_price": 36.24, "max_price": 39.85, "min_price": 32.65, "open_price": 36.25}
+  data_id=8932                                                 [#  3] HTTP 200  0.06s rows=2     msg=success
+      {"date": "2024-09-09", "stock_id": "8932", "type": "面額變更", "before_price": 169.5, "after_price": 84.75, "max_price": 93.2, "min_price": 76.3, "open_price": 84.8}
+      {"date": "2026-03-09", "stock_id": "8932", "type": "面額變更", "before_price": 199.5, "after_price": 99.75, "max_price": 109.5, "min_price": 89.8, "open_price": 99.8}
+  data_id=0050                                                 [#  4] HTTP 200  0.06s rows=1     msg=success
+      {"date": "2025-06-18", "stock_id": "0050", "type": "分割", "before_price": 188.65, "after_price": 47.16, "max_price": 51.85, "min_price": 42.45, "open_price": 47.16}
+
+A3. 回溯下限：查 2019-09-09 之前有沒有任何一列
+  start=1990-01-01&end=2019-09-08                              [#  5] HTTP 200  0.06s rows=0     msg=success
+  start=1990-01-01&end=2019-12-31                              [#  6] HTTP 200  0.05s rows=1     msg=success
+
+A4. 日期參數是否真的在過濾（不是回固定快照）
+  start=2026-01-01（無 end）                                      [#  7] HTTP 200  0.05s rows=7     msg=success
+  完全不帶任何參數                                                     [#  8] HTTP 200  0.06s rows=32    msg=success
+  data_id=0050、不帶 start_date                                   [#  9] HTTP 200  0.07s rows=1     msg=success
+
+================================================================================================
+### B. TaiwanStockSplitPrice.date 的語意：對照 TaiwanStockPrice 的實際交易日
+================================================================================================
+  0050    事件日 2025-06-18（SplitPrice 分割）                        [# 10] HTTP 200  0.06s rows=10    msg=success
+      觀察窗內交易日：2025-06-05 2025-06-06 2025-06-09 2025-06-10 2025-06-18 2025-06-19 2025-06-20 2025-06-23 2025-06-24 2025-06-25
+      事件日前最後一個交易日 2025-06-10 close=188.65
+      事件日當天：{"date": "2025-06-18", "stock_id": "0050", "Trading_Volume": 252639825, "Trading_money": 12002805591, "open": 47.5, "max": 47.72, "min": 47.14, "close": 47.57, "spread": 0.41, "Trading_turnover": 197610}
+  0052    事件日 2025-11-26（SplitPrice 分割）                        [# 11] HTTP 200  0.07s rows=9     msg=success
+      觀察窗內交易日：2025-11-14 2025-11-17 2025-11-18 2025-11-26 2025-11-27 2025-11-28 2025-12-01 2025-12-02 2025-12-03
+      事件日前最後一個交易日 2025-11-18 close=245.3
+      事件日當天：{"date": "2025-11-26", "stock_id": "0052", "Trading_Volume": 272824460, "Trading_money": 9641791242, "open": 35.38, "max": 35.4, "min": 35.2, "close": 35.35, "spread": 0.31, "Trading_turnover": 133863}
+  00631L  事件日 2026-03-31（SplitPrice type 為空字串）                 [# 12] HTTP 200  0.06s rows=7     msg=success
+      觀察窗內交易日：2026-03-20 2026-03-23 2026-03-24 2026-03-31 2026-04-01 2026-04-02 2026-04-07
+      事件日前最後一個交易日 2026-03-24 close=443.15
+      事件日當天：{"date": "2026-03-31", "stock_id": "00631L", "Trading_Volume": 317428710, "Trading_money": 6177634875, "open": 19.67, "max": 19.88, "min": 19.1, "close": 19.26, "spread": -0.88, "Trading_turnover": 115997}
+  6548    事件日 2019-09-09（SplitPrice 面額變更）                      [# 13] HTTP 200  0.06s rows=6     msg=success
+      觀察窗內交易日：2019-08-28 2019-09-09 2019-09-10 2019-09-11 2019-09-12 2019-09-16
+      事件日前最後一個交易日 2019-08-28 close=312.0
+      事件日當天：{"date": "2019-09-09", "stock_id": "6548", "Trading_Volume": 173094, "Trading_money": 5937123, "open": 34.3, "max": 34.3, "min": 34.3, "close": 34.3, "spread": 3.1, "Trading_turnover": 100}
+  8932    事件日 2026-03-09（SplitPrice 面額變更）                      [# 14] HTTP 200  0.06s rows=8     msg=success
+      觀察窗內交易日：2026-02-23 2026-02-24 2026-03-09 2026-03-10 2026-03-11 2026-03-12 2026-03-13 2026-03-16
+      事件日前最後一個交易日 2026-02-24 close=199.5
+      事件日當天：{"date": "2026-03-09", "stock_id": "8932", "Trading_Volume": 1687531, "Trading_money": 151540180, "open": 89.8, "max": 89.8, "min": 89.8, "close": 89.8, "spread": -10.0, "Trading_turnover": 1180}
+  2327    事件日 2025-08-25（SplitPrice 面額變更）                      [# 15] HTTP 200  0.06s rows=8     msg=success
+      觀察窗內交易日：2025-08-12 2025-08-13 2025-08-25 2025-08-26 2025-08-27 2025-08-28 2025-08-29 2025-09-01
+      事件日前最後一個交易日 2025-08-13 close=546.0
+      事件日當天：{"date": "2025-08-25", "stock_id": "2327", "Trading_Volume": 26586959, "Trading_money": 3792278409, "open": 142.0, "max": 145.5, "min": 140.0, "close": 143.0, "spread": 0.0, "Trading_turnover": 19819}
+  2603    事件日 2022-09-19（CapitalReduction 現金減資）                [# 16] HTTP 200  0.07s rows=12    msg=success
+      觀察窗內交易日：2022-08-30 2022-08-31 2022-09-01 2022-09-02 2022-09-05 2022-09-06 2022-09-19 2022-09-20 2022-09-21 2022-09-22 2022-09-23 2022-09-26
+      事件日前最後一個交易日 2022-09-06 close=80.8
+      事件日當天：{"date": "2022-09-19", "stock_id": "2603", "Trading_Volume": 69441741, "Trading_money": 12325299084, "open": 185.5, "max": 186.0, "min": 169.0, "close": 169.0, "spread": 0.0, "Trading_turnover": 46381}
+  2409    事件日 2022-10-11（CapitalReduction 現金減資）                [# 17] HTTP 200  0.07s rows=9     msg=success
+      觀察窗內交易日：2022-09-26 2022-09-27 2022-09-28 2022-10-11 2022-10-12 2022-10-13 2022-10-14 2022-10-17 2022-10-18
+      事件日前最後一個交易日 2022-09-28 close=14.7
+      事件日當天：{"date": "2022-10-11", "stock_id": "2409", "Trading_Volume": 71435572, "Trading_money": 1163186687, "open": 16.15, "max": 16.7, "min": 15.9, "close": 16.45, "spread": 0.0, "Trading_turnover": 25169}
+  6116    事件日 2012-09-27（CapitalReduction 彌補虧損）                [# 18] HTTP 200  0.06s rows=13    msg=success
+      觀察窗內交易日：2012-09-05 2012-09-06 2012-09-07 2012-09-10 2012-09-11 2012-09-12 2012-09-27 2012-09-28 2012-10-01 2012-10-02 2012-10-03 2012-10-04 2012-10-05
+      事件日前最後一個交易日 2012-09-12 close=1.69
+      事件日當天：{"date": "2012-09-27", "stock_id": "6116", "Trading_Volume": 14272259, "Trading_money": 46340231, "open": 3.56, "max": 3.56, "min": 3.15, "close": 3.15, "spread": 0.0, "Trading_turnover": 1263}
+
+================================================================================================
+### C. 減資／換股／合併的可程式化資料源盤點
+================================================================================================
+
+C1. FinMind TaiwanStockCapitalReductionReferencePrice（減資恢復買賣參考價格）
+  data_id=2603                                                 [# 19] HTTP 200  0.06s rows=1     msg=success
+      {"date": "2022-09-19", "stock_id": "2603", "ClosingPriceonTheLastTradingDay": 80.8, "PostReductionReferencePrice": 187.0, "LimitUp": 205.5, "LimitDown": 168.5, "OpeningReferencePrice": 187.0, "ExrightReferencePrice": -1.0, "ReasonforCapitalReduction": "Cash refund"}
+  data_id=2409                                                 [# 20] HTTP 200  0.07s rows=1     msg=success
+      {"date": "2022-10-11", "stock_id": "2409", "ClosingPriceonTheLastTradingDay": 14.7, "PostReductionReferencePrice": 15.87, "LimitUp": 17.45, "LimitDown": 14.3, "OpeningReferencePrice": 15.85, "ExrightReferencePrice": -1.0, "ReasonforCapitalReduction": "Cash refund"}
+  data_id=6116                                                 [# 21] HTTP 200  0.06s rows=1     msg=success
+      {"date": "2012-09-27", "stock_id": "6116", "ClosingPriceonTheLastTradingDay": 1.69, "PostReductionReferencePrice": 3.38, "LimitUp": 3.61, "LimitDown": 3.15, "OpeningReferencePrice": 3.38, "ExrightReferencePrice": -1.0, "ReasonforCapitalReduction": "Making up losses"}
+  data_id=0050                                                 [# 22] HTTP 200  0.11s rows=0     msg=success
+  data_id=2618                                                 [# 23] HTTP 200  0.08s rows=0     msg=success
+  data_id=1314                                                 [# 24] HTTP 200  0.06s rows=0     msg=success
+
+C2. FinMind TaiwanStockParValueChange（變更面額恢復買賣參考價格）
+  不帶 data_id                                                   [# 25] HTTP 200  0.05s rows=16    msg=success
+    {"date": "2019-09-09", "stock_id": "6548", "stock_name": "長科", "before_close": 312.0, "after_ref_close": 31.2, "after_ref_max": 34.3, "after_ref_min": 28.1, "after_ref_open": 31.2}
+    {"date": "2020-08-17", "stock_id": "8070", "stock_name": "長華", "before_close": 190.0, "after_ref_close": 19.0, "after_ref_max": 20.9, "after_ref_min": 17.1, "after_ref_open": 19.0}
+    {"date": "2021-10-18", "stock_id": "6531", "stock_name": "愛普", "before_close": 750.0, "after_ref_close": 375.0, "after_ref_max": 412.5, "after_ref_min": 337.5, "after_ref_open": 375.0}
+    {"date": "2022-07-13", "stock_id": "6415", "stock_name": "矽力-KY", "before_close": 2485.0, "after_ref_close": 621.25, "after_ref_max": 683.0, "after_ref_min": 560.0, "after_ref_open": 621.0}
+    {"date": "2022-08-29", "stock_id": "6613", "stock_name": "朋億", "before_close": 169.0, "after_ref_close": 84.5, "after_ref_max": 92.9, "after_ref_min": 76.1, "after_ref_open": 84.5}
+    {"date": "2022-09-05", "stock_id": "6548", "stock_name": "長科", "before_close": 90.6, "after_ref_close": 36.24, "after_ref_max": 39.85, "after_ref_min": 32.65, "after_ref_open": 36.25}
+    {"date": "2022-09-19", "stock_id": "5536", "stock_name": "聖暉", "before_close": 206.0, "after_ref_close": 103.0, "after_ref_max": 113.0, "after_ref_min": 92.7, "after_ref_open": 103.0}
+    {"date": "2022-12-12", "stock_id": "3093", "stock_name": "港建", "before_close": 109.5, "after_ref_close": 27.38, "after_ref_max": 30.1, "after_ref_min": 24.65, "after_ref_open": 27.4}
+    {"date": "2024-09-09", "stock_id": "6763", "stock_name": "綠界科技", "before_close": 491.0, "after_ref_close": 49.1, "after_ref_max": 54.0, "after_ref_min": 44.2, "after_ref_open": 49.1}
+    {"date": "2024-09-09", "stock_id": "8932", "stock_name": "智通", "before_close": 169.5, "after_ref_close": 84.75, "after_ref_max": 93.2, "after_ref_min": 76.3, "after_ref_open": 84.8}
+    {"date": "2024-11-11", "stock_id": "8476", "stock_name": "台境", "before_close": 58.8, "after_ref_close": 29.4, "after_ref_max": 32.3, "after_ref_min": 26.5, "after_ref_open": 29.4}
+    {"date": "2024-12-09", "stock_id": "5278", "stock_name": "尚凡", "before_close": 319.5, "after_ref_close": 31.95, "after_ref_max": 35.1, "after_ref_min": 28.8, "after_ref_open": 31.95}
+    {"date": "2025-03-31", "stock_id": "5314", "stock_name": "世紀", "before_close": 1390.0, "after_ref_close": 69.5, "after_ref_max": 76.4, "after_ref_min": 62.6, "after_ref_open": 69.5}
+    {"date": "2025-06-30", "stock_id": "4763", "stock_name": "材料-KY", "before_close": 885.0, "after_ref_close": 88.5, "after_ref_max": 97.3, "after_ref_min": 79.7, "after_ref_open": 88.5}
+    {"date": "2025-07-21", "stock_id": "6919", "stock_name": "康霈*", "before_close": 1215.0, "after_ref_close": 121.5, "after_ref_max": 133.5, "after_ref_min": 109.5, "after_ref_open": 121.5}
+    {"date": "2025-08-25", "stock_id": "2327", "stock_name": "國巨", "before_close": 546.0, "after_ref_close": 136.5, "after_ref_max": 150.0, "after_ref_min": 123.0, "after_ref_open": 136.5}
+      日期範圍：2019-09-09 ~ 2025-08-25（16 列）
+  帶 data_id=6548                                               [# 26] HTTP 400  0.05s {"msg": "parameter data_id don't provide on TaiwanStockParValueChange dataset", "status": 400, "token_tail": ""}
+
+C3. FinMind 有沒有合併／換股 dataset（拿不存在的名字打，讓 enum 錯誤訊息吐出合法清單）
+  dataset=TaiwanStockMerger -> HTTP 422
+  合法 dataset 全清單（回應原文）：
+    {"detail": [{"type": "enum", "loc": ["query", "dataset"], "msg": "Input should be 'CnnFearGreedIndex', 'CrudeOilPrices', 'EuropeStockInfo', 'EuropeStockPrice', 'ExchangeRate', 'GoldPrice', 'GovernmentBondsYield', 'InterestRate', 'JapanStockInfo', 'JapanStockPrice', 'TaiwanAssetSwapFixedIncomeDaily', 'TaiwanAssetSwapOptionDaily', 'TaiwanBusinessIndicator', 'TaiwanDailyShortSaleBalances', 'TaiwanExchangeRate', 'TaiwanFutOptDailyInfo', 'TaiwanFutOptInstitutionalInvestors', 'TaiwanFutOptTickInfo', 'TaiwanFuturesDaily', 'TaiwanFuturesDealerTradingVolumeDaily', 'TaiwanFuturesFinalSettlementPrice', 'TaiwanFuturesInstitutionalInvestors', 'TaiwanFuturesInstitutionalInvestorsAfterHours', 'TaiwanFuturesOpenInterestLargeTraders', 'TaiwanFuturesSpreadTick', 'TaiwanFuturesSpreadTrading', 'TaiwanFuturesTick', 'TaiwanOptionDaily', 'TaiwanOptionDealerTradingVolumeDaily', 'TaiwanOptionFinalSettlementPrice', 'TaiwanOptionInstitutionalInvestors', 'TaiwanOptionInstitutionalInvestorsAfterHours', 'TaiwanOptionOpenInterestLargeTraders', 'TaiwanOptionTick', 'TaiwanOptionVix', 'TaiwanSecuritiesTraderInfo', 'TaiwanStock10Year', 'TaiwanStockActiveETFHolding', 'TaiwanStockActiveETFHoldingChange', 'TaiwanStockActiveETFInfo', 'TaiwanStockBalanceSheet', 'TaiwanStockBlockTrade', 'TaiwanStockBlockTradingDailyReport', 'TaiwanStockCapitalReductionReferencePrice', 'TaiwanStockCashFlowsStatement', 'TaiwanStockConvertibleBondDaily', 'TaiwanStockConvertibleBondDailyOverview', 'TaiwanStockConvertibleBondInfo', 'TaiwanStockConvertibleBondInstitutionalInvestors', 'TaiwanStockConvertibleBondMonthlyAnalysis', 'TaiwanStockConvertibleBondPutProvision', 'TaiwanStockDayTrading', 'TaiwanStockDayTradingBorrowingFeeRate', 'TaiwanStockDayTradingSuspension', 'TaiwanStockDelisting', 'TaiwanStockDispositionSecuritiesPeriod', 'TaiwanStockDividend', 'TaiwanStockDividendResult', 'TaiwanStockEvery5SecondsIndex', 'TaiwanStockFinancialStatements', 'TaiwanStockGovernmentBankBuySell', 'TaiwanStockHoldingSharesPer', 'TaiwanStockIndustryChain', 'TaiwanStockIndustryChainMoneyFlow', 'TaiwanStockInfo', 'TaiwanStockInfoWithWarrant', 'TaiwanStockInfoWithWarrantSummary', 'TaiwanStockInstitutionalInvestorsBuySell', 'TaiwanStockInstitutionalInvestorsBuySellWide', 'TaiwanStockKBar', 'TaiwanStockLoanCollateralBalance', 'TaiwanStockMarginMaintenance', 'TaiwanStockMarginPurchaseShortSale', 'TaiwanStockMarginShortSaleSuspension', 'TaiwanStockMarketValue', 'TaiwanStockMarketValueWeight', 'TaiwanStockMonthPrice', 'TaiwanStockMonthRevenue', 'TaiwanStockNews', 'TaiwanStockParValueChange', 'TaiwanStockPER', 'TaiwanStockPrice', 'TaiwanStockPriceAdj', 'TaiwanStockPriceLimit', 'TaiwanStockPriceTick', 'TaiwanStockSecuritiesLending', 'TaiwanStockShareholding', 'TaiwanStockSplitPrice', 'TaiwanStockStatisticsOfOrderBookAndTrade', 'TaiwanStockSuspended', 'TaiwanStockTotalInstitutionalInvestors', 'TaiwanStockTotalMarginPurchaseShortSale', 'TaiwanStockTotalReturnIndex', 'TaiwanStockTradingDailyReport', 'TaiwanStockTradingDate', 'TaiwanStockWarrantTradingDailyReport', 'TaiwanStockWeekPrice', 'TaiwanTotalExchangeMarginMaintenance', 'TaiwanVariousIndicators5Seconds', 'UKStockInfo', 'UKStockPrice', 'USStockInfo', 'USStockPrice' or 'USStockPriceMinute'", "input": "TaiwanStockMerger", "ctx": {"expected": "'CnnFearGreedIndex', 'CrudeOilPrices', 'EuropeStockInfo', 'EuropeStockPrice', 'ExchangeRate', 'GoldPrice', 'GovernmentBondsYield', 'InterestRate', 'JapanStockInfo', 'JapanStockPrice', 'TaiwanAssetSwapFixedIncomeDaily', 'TaiwanAssetSwapOptionDaily', 'TaiwanBusinessIndicator', 'TaiwanDailyShortSaleBalances', 'TaiwanExchangeRate', 'TaiwanFutOptDailyInfo', 'TaiwanFutOptInstitutionalInvestors', 'TaiwanFutOptTickInfo', 'TaiwanFuturesDaily', 'TaiwanFuturesDealerTradingVolumeDaily', 'TaiwanFuturesFinalSettlementPrice', 'TaiwanFuturesInstitutionalInvestors', 'TaiwanFuturesInstitutionalInvestorsAfterHours', 'TaiwanFuturesOpenInterestLargeTraders', 'TaiwanFuturesSpreadTick', 'TaiwanFuturesSpreadTrading', 'TaiwanFuturesTick', 'TaiwanOptionDaily', 'TaiwanOptionDealerTradingVolumeDaily', 'TaiwanOptionFinalSettlementPrice', 'TaiwanOptionInstitutionalInvestors', 'TaiwanOptionInstitutionalInvestorsAfterHours', 'TaiwanOptionOpenInterestLargeTraders', 'TaiwanOptionTick', 'TaiwanOptionVix', 'TaiwanSecuritiesTraderInfo', 'TaiwanStock10Year', 'TaiwanStockActiveETFHolding', 'TaiwanStockActiveETFHoldingChange', 'TaiwanStockActiveETFInfo', 'TaiwanStockBalanceSheet', 'TaiwanStockBlockTrade', 'TaiwanStockBlockTradingDailyReport', 'TaiwanStockCapitalReductionReferencePrice', 'TaiwanStockCashFlowsStatement', 'TaiwanStockConvertibleBondDaily', 'TaiwanStockConvertibleBondDailyOverview', 'TaiwanStockConvertibleBondInfo', 'TaiwanStockConvertibleBondInstitutionalInvestors', 'TaiwanStockConvertibleBondMonthlyAnalysis', 'TaiwanStockConvertibleBondPutProvision', 'TaiwanStockDayTrading', 'TaiwanStockDayTradingBorrowingFeeRate', 'TaiwanStockDayTradingSuspension', 'TaiwanStockDelisting', 'TaiwanStockDispositionSecuritiesPeriod', 'TaiwanStockDividend', 'TaiwanStockDividendResult', 'TaiwanStockEvery5SecondsIndex', 'TaiwanStockFinancialStatements', 'TaiwanStockGovernmentBankBuySell', 'TaiwanStockHoldingSharesPer', 'TaiwanStockIndustryChain', 'TaiwanStockIndustryChainMoneyFlow', 'TaiwanStockInfo', 'TaiwanStockInfoWithWarrant', 'TaiwanStockInfoWithWarrantSummary', 'TaiwanStockInstitutionalInvestorsBuySell', 'TaiwanStockInstitutionalInvestorsBuySellWide', 'TaiwanStockKBar', 'TaiwanStockLoanCollateralBalance', 'TaiwanStockMarginMaintenance', 'TaiwanStockMarginPurchaseShortSale', 'TaiwanStockMarginShortSaleSuspension', 'TaiwanStockMarketValue', 'TaiwanStockMarketValueWeight', 'TaiwanStockMonthPrice', 'TaiwanStockMonthRevenue', 'TaiwanStockNews', 'TaiwanStockParValueChange', 'TaiwanStockPER', 'TaiwanStockPrice', 'TaiwanStockPriceAdj', 'TaiwanStockPriceLimit', 'TaiwanStockPriceTick', 'TaiwanStockSecuritiesLending', 'TaiwanStockShareholding', 'TaiwanStockSplitPrice', 'TaiwanStockStatisticsOfOrderBookAndTrade', 'TaiwanStockSuspended', 'TaiwanStockTotalInstitutionalInvestors', 'TaiwanStockTotalMarginPurchaseShortSale', 'TaiwanStockTotalReturnIndex', 'TaiwanStockTradingDailyReport', 'TaiwanStockTradingDate', 'TaiwanStockWarrantTradingDailyReport', 'TaiwanStockWeekPrice', 'TaiwanTotalExchangeMarginMaintenance', 'TaiwanVariousIndicators5Seconds', 'UKStockInfo', 'UKStockPrice', 'USStockInfo', 'USStockPrice' or 'USStockPriceMinute'"}}]}
+
+C4. 唯一沾得上邊的兩個既有 dataset
+  TaiwanStockDelisting（下市櫃表）不帶 data_id                         [# 28] HTTP 200  0.07s rows=340   msg=success
+      欄位：['date', 'stock_id', 'stock_name']
+      最新一列：{"date": "2026-07-28", "stock_id": "4130", "stock_name": "健亞"}
+      最舊一列：{"date": "2001-01-20", "stock_id": "1505", "stock_name": "楊鐵工廠"}
+  TaiwanStockSuspended（暫停交易公告）不帶 data_id                       [# 29] HTTP 400  0.05s {"msg": "Your level is free. Please update your user level. Detail information:https://finmindtrade.com/analysis/#/Sponsor/sponsor", "status": 400, "token_tail": ""}
+
+================================================================================================
+### D. FinMind 免費層的『不帶 data_id 全市場拉取』權限矩陣
+================================================================================================
+  TaiwanStockSplitPrice                                        [# 30] HTTP 200  0.06s rows=0     msg=success
+  TaiwanStockParValueChange                                    [# 31] HTTP 200  0.06s rows=0     msg=success
+  TaiwanStockDelisting                                         [# 32] HTTP 200  0.05s rows=0     msg=success
+  TaiwanStockCapitalReductionReferencePrice                    [# 33] HTTP 400  0.06s {"msg": "Your level is free. Please update your user level. Detail information:https://finmindtrade.com/analysis/#/Sponsor/sponsor", "status": 400, "token_tail": ""}
+  TaiwanStockDividendResult                                    [# 34] HTTP 400  0.05s {"msg": "Your level is free. Please update your user level. Detail information:https://finmindtrade.com/analysis/#/Sponsor/sponsor", "status": 400, "token_tail": ""}
+  TaiwanStockDividend                                          [# 35] HTTP 400  0.06s {"msg": "Your level is free. Please update your user level. Detail information:https://finmindtrade.com/analysis/#/Sponsor/sponsor", "status": 400, "token_tail": ""}
+  TaiwanStockPrice                                             [# 36] HTTP 400  0.06s {"msg": "Your level is free. Please update your user level. Detail information:https://finmindtrade.com/analysis/#/Sponsor/sponsor", "status": 400, "token_tail": ""}
+  TaiwanStockSuspended                                         [# 37] HTTP 400  0.06s {"msg": "Your level is free. Please update your user level. Detail information:https://finmindtrade.com/analysis/#/Sponsor/sponsor", "status": 400, "token_tail": ""}
+
+================================================================================================
+### E. TWSE／TPEx OpenAPI（政府資料開放授權側）有沒有公司行動端點
+================================================================================================
+
+E1. TWSE openapi.twse.com.tw
+  GET https://openapi.twse.com.tw/v1/swagger.json -> HTTP 200, 306043 bytes
+  paths 總數：143
+    HIT /company/suspendListingCsvAndHtml                終止上市公司
+    HIT /exchangeReport/TWTAWU                           集中市場暫停交易證券
+    HIT /exchangeReport/TWTBAU1                          集中市場暫停先賣後買當日沖銷交易標的預告表
+    HIT /exchangeReport/TWTBAU2                          集中市場暫停先賣後買當日沖銷交易歷史查詢
+    HIT /opendata/t187ap26_L                             上市公司經營權及營業範圍異(變)動專區-經營權異動且營業範圍重大變更停止買賣公司
+    HIT /opendata/t187ap29_C_L                           上市公司合併報表董事酬金相關資訊
+    HIT /opendata/t187ap29_D_L                           上市公司合併報表監察人酬金相關資訊
+
+E2. TPEx www.tpex.org.tw/openapi
+  GET https://www.tpex.org.tw/openapi/swagger.json -> HTTP 200, 476923 bytes
+  paths 總數：225
+    HIT /mopsfin_t187ap26_O                              上櫃公司經營權及營業範圍異(變)動專區-經營權異動且營業範圍重大變更停止買賣公司
+    HIT /mopsfin_t187ap29_C_O                            上櫃公司合併報表董事酬金相關資訊
+    HIT /mopsfin_t187ap29_D_O                            上櫃公司合併報表監察人酬金相關資訊
+    HIT /tpex_intraday_trading_his                       上櫃暫停先賣後買當日沖銷交易歷史查詢
+    HIT /tpex_intraday_trading_pre                       上櫃暫停先賣後買當日沖銷交易標的預告表
+    HIT /tpex_margin_trading_term                        上櫃融資融券暫停融券賣出預告表
+    HIT /tpex_spendi_history                             上櫃歷史公布暫停/恢復交易股票
+    HIT /tpex_spendi_today                               上櫃當日公布暫停/恢復交易股票
+    HIT /tpex_warrant_suspend_history                    上櫃權證歷史暫停/恢復交易資訊
+    HIT /tpex_warrant_suspend_today                      上櫃權證當日暫停/恢復交易資訊
+
+E2b. 更嚴格的否證：直接在 swagger 原始文字中搜 TWSE 那四張公司行動報表的代號
+  https://openapi.twse.com.tw/v1/swagger.json（306043 bytes）
+    TWTC9U           出現於 swagger 原文：False
+    TWTCAU           出現於 swagger 原文：False
+    TWTAUU           出現於 swagger 原文：False
+    TWTB8U           出現於 swagger 原文：False
+    twtc9u           出現於 swagger 原文：False
+    twtcau           出現於 swagger 原文：False
+    twtauu           出現於 swagger 原文：False
+    twtb8u           出現於 swagger 原文：False
+    reduction        出現於 swagger 原文：False
+    split            出現於 swagger 原文：False
+    ParValue         出現於 swagger 原文：False
+    ReferencePrice   出現於 swagger 原文：False
+  https://www.tpex.org.tw/openapi/swagger.json（476923 bytes）
+    TWTC9U           出現於 swagger 原文：False
+    TWTCAU           出現於 swagger 原文：False
+    TWTAUU           出現於 swagger 原文：False
+    TWTB8U           出現於 swagger 原文：False
+    twtc9u           出現於 swagger 原文：False
+    twtcau           出現於 swagger 原文：False
+    twtauu           出現於 swagger 原文：False
+    twtb8u           出現於 swagger 原文：False
+    reduction        出現於 swagger 原文：False
+    split            出現於 swagger 原文：False
+    ParValue         出現於 swagger 原文：True
+    ReferencePrice   出現於 swagger 原文：True
+
+E3. 實打命中的端點，看欄位與回傳筆數
+
+  https://openapi.twse.com.tw/v1/exchangeReport/TWTAWU -> HTTP 200, 1 列
+    欄位：['Number', 'Code', 'Name', 'TradingHaltDate', 'TradingHaltTime', 'TradingResumptionDate', 'TradingResumptionTime']
+    {"Number": "1", "Code": "4169", "Name": "泰宗", "TradingHaltDate": "1150723", "TradingHaltTime": "080000", "TradingResumptionDate": "1150724", "TradingResumptionTime": "080000"}
+
+  https://openapi.twse.com.tw/v1/company/suspendListingCsvAndHtml -> HTTP 200, 264 列
+    欄位：['DelistingDate', 'Company', 'Code']
+    {"DelistingDate": "115/06/23", "Company": "森崴能源", "Code": "6806"}
+    {"DelistingDate": "115/03/27", "Company": "晶睿", "Code": "3454"}
+    {"DelistingDate": "115/01/22", "Company": "億而得-創", "Code": "6423"}
+
+  https://openapi.twse.com.tw/v1/exchangeReport/TWT48U_ALL -> HTTP 200, 117 列
+    欄位：['Date', 'Code', 'Name', 'Exdividend', 'StockDividendRatio', 'SubscriptionRatio', 'SubscriptionPricePerShare', 'CashDividend', 'SharesOffered', 'SharesEmpOwner', 'SharesholderOwner', 'StockHoldingRatio']
+    {"Date": "1150814", "Code": "00401A", "Name": "主動摩根台灣鑫收", "Exdividend": "息", "StockDividendRatio": "", "SubscriptionRatio": "", "SubscriptionPricePerShare": "", "CashDividend": "", "SharesOffered": "", "SharesEmpOwner": "", "SharesholderOwner": "", "StockHoldingRatio": ""}
+    {"Date": "1150818", "Code": "00690", "Name": "兆豐藍籌30", "Exdividend": "息", "StockDividendRatio": "", "SubscriptionRatio": "", "SubscriptionPricePerShare": "", "CashDividend": "", "SharesOffered": "", "SharesEmpOwner": "", "SharesholderOwner": "", "StockHoldingRatio": ""}
+    {"Date": "1150818", "Code": "00701", "Name": "國泰股利精選30", "Exdividend": "息", "StockDividendRatio": "", "SubscriptionRatio": "", "SubscriptionPricePerShare": "", "CashDividend": "", "SharesOffered": "", "SharesEmpOwner": "", "SharesholderOwner": "", "StockHoldingRatio": ""}
+
+  https://www.tpex.org.tw/openapi/v1/tpex_spendi_history -> HTTP 200, 360 列
+    欄位：['Date', 'Serial', 'SecuritiesCompanyCode', 'CompanyName', 'DateOfSuspendedTrading', 'TimeOfSuspendedTrading', 'DateOfResumedTrading', 'TimeOfResumedTrading']
+    {"Date": "115", "Serial": "1", "SecuritiesCompanyCode": "1788", "CompanyName": "杏昌", "DateOfSuspendedTrading": "1150618", "TimeOfSuspendedTrading": "080000", "DateOfResumedTrading": "", "TimeOfResumedTrading": ""}
+    {"Date": "115", "Serial": "2", "SecuritiesCompanyCode": "1788", "CompanyName": "杏昌", "DateOfSuspendedTrading": "", "TimeOfSuspendedTrading": "", "DateOfResumedTrading": "1150622", "TimeOfResumedTrading": "080000"}
+    {"Date": "115", "Serial": "3", "SecuritiesCompanyCode": "1799", "CompanyName": "易威", "DateOfSuspendedTrading": "1150312", "TimeOfSuspendedTrading": "080000", "DateOfResumedTrading": "", "TimeOfResumedTrading": ""}
+
+  https://www.tpex.org.tw/openapi/v1/tpex_exright_prepost -> HTTP 200, 145 列
+    欄位：['ExRrightsExDividendDate', 'SecuritiesCompanyCode', 'CompanyName', 'ExRrightsExDividend', 'StockDividendRatio', 'SubscriptionRatioToNewSharesIssued', 'SubscriptionPricePerShare', 'CashDividend', 'AllocatedForPublicUnderwriting', 'SubscribedByEmployees', 'SubscribedByExistingShareholders', 'SubscribedProRataInThousandShares']
+    {"ExRrightsExDividendDate": "1150729", "SecuritiesCompanyCode": "3131", "CompanyName": "弘塑", "ExRrightsExDividend": "除息", "StockDividendRatio": "0.00000000", "SubscriptionRatioToNewSharesIssued": "0.00000000", "SubscriptionPricePerShare": "0.00", "CashDividend": "46.08446132", "AllocatedForPublicUnderwriting": "0", "SubscribedByEmployees": "0", "SubscribedByExistingShareholders": "0", "SubscribedProRataInThousandShares": "0.00000000"}
+    {"ExRrightsExDividendDate": "1150729", "SecuritiesCompanyCode": "3527", "CompanyName": "聚積", "ExRrightsExDividend": "除息", "StockDividendRatio": "0.00000000", "SubscriptionRatioToNewSharesIssued": "0.00000000", "SubscriptionPricePerShare": "0.00", "CashDividend": "1.00000000", "AllocatedForPublicUnderwriting": "0", "SubscribedByEmployees": "0", "SubscribedByExistingShareholders": "0", "SubscribedProRataInThousandShares": "0.00000000"}
+    {"ExRrightsExDividendDate": "1150729", "SecuritiesCompanyCode": "3537", "CompanyName": "堡達", "ExRrightsExDividend": "除息", "StockDividendRatio": "0.00000000", "SubscriptionRatioToNewSharesIssued": "0.00000000", "SubscriptionPricePerShare": "0.00", "CashDividend": "2.00000000", "AllocatedForPublicUnderwriting": "0", "SubscribedByEmployees": "0", "SubscribedByExistingShareholders": "0", "SubscribedProRataInThousandShares": "0.00000000"}
+
+================================================================================================
+### F. 減資資料集的回溯深度（抽樣掃描）＋ FinMind 免費層限流門檻
+================================================================================================
+
+F1. 回應標頭全文（看有沒有任何 rate-limit 相關欄位）
+    Access-Control-Allow-Origin: *
+    Content-Length: 198
+    Content-Type: application/json
+    Date: Sun, 09 Aug 2026 11:06:10 GMT
+    Server: uvicorn
+
+F2. 對 400 檔抽樣標的逐一查 TaiwanStockCapitalReductionReferencePrice
+  TaiwanStockInfo 取得 4 碼數字代號 2542 檔（母體）
+  ⚠️ 第 366 個累計 FinMind 請求（本節第 327 檔，stock_id=6928）起被擋：
+     {"msg": "Requests reach the upper limit. https://finmindtrade.com/", "status": 402, "token_tail": ""}
+  本節送出 327 個請求、耗時 20.8 秒；狀態碼分布 {200: 326, 402: 1}
+  成功掃完 326 檔，命中 115 列，涵蓋 67 檔
+  欄位：['date', 'stock_id', 'ClosingPriceonTheLastTradingDay', 'PostReductionReferencePrice', 'LimitUp', 'LimitDown', 'OpeningReferencePrice', 'ExrightReferencePrice', 'ReasonforCapitalReduction']
+  最早：{"date": "2011-08-25", "stock_id": "1451", "ClosingPriceonTheLastTradingDay": 22.5, "PostReductionReferencePrice": 24.28, "LimitUp": 25.95, "LimitDown": 22.6, "OpeningReferencePrice": 24.3, "ExrightReferencePrice": -1.0, "ReasonforCapitalReduction": "Cash refund"}
+  最新：{"date": "2026-08-03", "stock_id": "1459", "ClosingPriceonTheLastTradingDay": 11.85, "PostReductionReferencePrice": 12.46, "LimitUp": 13.7, "LimitDown": 11.25, "OpeningReferencePrice": 12.45, "ExrightReferencePrice": -1.0, "ReasonforCapitalReduction": "Cash refund"}
+  ReasonforCapitalReduction 值分布：{"Cash refund": 34, "Making up losses": 32, "彌補虧損": 33, "現金減資": 16}
+  一檔多列者：{"1451": ["2011-08-25", "2012-08-20", "2013-01-01", "2013-08-19", "2017-10-11"], "6225": ["2012-08-06", "2017-12-18", "2019-02-18", "2021-07-26", "2022-11-28"], "2438": ["2012-11-26", "2014-11-21", "2021-01-11"], "6287": ["2013-08-22", "2022-10-03"], "6291": ["2013-09-14", "2017-09-15", "2019-03-11", "2022-09-26"], "2327": ["2013-09-18", "2014-10-09", "2016-08-15", "2017-08-18", "2022-10-21", "2022-10-31"], "6198": ["2013-11-28", "2020-11-30"], "6246": ["2013-12-20", "2016-10-31"], "3086": ["2014-11-27", "2017-03-30", "2020-01-13"], "4419": ["2015-03-27", "2023-03-01"], "3105": ["2015-08-28", "2016-09-23"], "2492": ["2015-10-05", "2016-09-23", "2017-09-19"], "6150": ["2015-10-06", "2016-11-03"], "6194": ["2015-11-06", "2019-10-21", "2022-10-24"], "6228": ["2016-11-15", "2023-10-11"], "2022": ["2018-08-27", "2023-08-28"], "4944": ["2018-09-25", "2020-09-29", "2022-08-31"], "6109": ["2018-09-25", "2020-09-25", "2022-08-08"], "2719": ["2019-10-21", "2020-12-31", "2022-08-01"], "5460": ["2019-11-04", "2021-11-01"], "3321": ["2019-11-18", "2023-08-31", "2025-09-15"], "2740": ["2020-02-24", "2025-01-13"], "3494": ["2021-11-29", "2024-11-25"], "6465": ["2021-12-06", "2025-11-24"], "3308": ["2022-01-06", "2023-12-11", "2024-04-01"], "3481": ["2022-10-11", "2023-08-28", "2024-08-26"]}
+  逐年列數：{"2011": 1, "2012": 6, "2013": 9, "2014": 4, "2015": 10, "2016": 8, "2017": 11, "2018": 8, "2019": 9, "2020": 9, "2021": 7, "2022": 14, "2023": 9, "2024": 4, "2025": 4, "2026": 2}
+
+  本次執行對 FinMind 的累計請求數：366
+
+完成：2026-08-09 19:06:31

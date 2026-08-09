@@ -274,15 +274,29 @@ FinMind 與 TWSE／TPEx 的價格**都是原始值，不做任何還原**。
 
 此調整掛在盤後排程，與 [#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19) 產生除權息 `pending_action` 的同一個事件上 —— **同一個事件、兩個消費者，不是兩次偵測**。
 
-> ### ⚠️ 2026-08-07 由 [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) 補上的缺口：**股票分割走不到這條路徑**
+> ### ✅ 2026-08-09 由 [#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 補上：**分割的峰值調整規則**
 >
-> 上述做法的觸發源是 `TaiwanStockDividendResult` 的 `reference_price`，而**分割不是除權息** —— 它在 `TaiwanStockSplitPrice`，是另一個 dataset。
+> 上述做法的觸發源是 `TaiwanStockDividendResult` 的 `reference_price`，而**分割不是除權息** —— 它在 `TaiwanStockSplitPrice`，是另一個 dataset。**實例**：0050 於 2025-06-18 一拆四（188.65 → 47.16），峰值會停在 188.65 而股價已是 47.57，本節開頭三個後果原封不動重演。
 >
-> **實例**：0050 於 **2025-06-18 一拆四**（分割前參考價 188.65 → 分割後 47.16）。峰值會停在 188.65，而股價已是 47.57 —— **本節開頭列出的三個後果會原封不動重演一次，包括第 3 點「長期黏在已觸發且不報錯」。**
+> **#20 的定案**（詳見 [`corporate-actions.md`](./corporate-actions.md) §2）：
 >
-> 這與除權息**完全同形，只是換了一個觸發源**。ETF 分割不是罕見事件（0050 是 2025 年台股 ETF 分割潮的一員，多檔跟進）。
+> ```
+> new_peak = old_peak / ratio        # 1 拆 4 → ratio=4；4 合 1 → ratio=0.25
+> ```
 >
-> **本規格暫不修改**：分割的型別與調整規則另立票處理，見 [`performance.md`](./performance.md) §8.6 與 §11。此處先標記缺口，避免實作時照著本節寫完就以為蓋全了。
+> **觸發源是已確認的 `SPLIT` transaction，不是 dataset。** 理由是本節下一條規則（峰值可重建）：綁在 `transaction` 上，重建路徑就是「掃 `transaction` + `daily_close`」，不需要重打外部 API；綁在 dataset 上，重建結果取決於「重建那一刻 FinMind 回了什麼」，那不是可重現的計算。
+>
+> **同一條公式同時涵蓋分割、反分割與面額變更**——TWSE 對三者用的是同一條參考價公式（分子無扣項），故 `before/after` 在定義上就是比率。**減資不適用**：其公式分子含「每股退還股款」扣項，`after/before` 混入現金退款，不是股數比率。
+
+### ⚠️ 硬性規則：未確認的公司行動期間，該標的的規則暫停評估
+
+[#20](https://github.com/NTUyu016/stock-analytic-platform/issues/20) 新增。分割被偵測到、但使用者尚未確認的那段時間，`peak_price` 與 `daily_close` 是不一致的——價格已經除以 4，峰值還沒有。
+
+**照舊評估會讓追蹤停損立刻誤觸發並發出 Discord 通知**；不等確認就先調整峰值則更糟——股數還沒改，**兩個數字用不同的真相**。
+
+> **只要某標的存在「未確認、且會改變股數」的 `pending_action`，該標的所有依賴股數或峰值的規則一律暫停評估，並在規則面板上標示暫停原因。**
+
+判準是**行為**而非嚴重度等級：暫停與否取決於「這個未確認項會不會改變股數」（`SPLIT`、股票股利、減資 → 會；現金股利 → 不會）。這是 [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14)「資料不足一律明說不給結論，不硬湊」與「評等被下修時必須標註原因」在警示上的直接適用。
 
 ### ⚠️ 硬性規則：峰值可重建，且必須有重建路徑
 
