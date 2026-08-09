@@ -302,10 +302,12 @@ v1 用 17 的理由不是「18 不好」，而是**這個專案的所有既有�
 | **WSL2 喚起** | 登入時 | 把發行版叫起來（`systemd` 隨之啟動 tailscaled 與 Docker）。**§1.1 已說明：漏掉這項，以下全部不會跑** |
 | `quote-worker` 開機 | 交易日 09:00 | `docker compose --profile intraday up -d` |
 | `quote-worker` 關機 | 交易日 13:35 | `docker compose --profile intraday stop` |
-| **盤後批次**（**單一任務，內含九個步驟**） | 每日 22:00 之後 | ① `daily_close` 回補 ② `benchmark_series` 回補 ③ `exchange_rate` 回補 ④ **除權息預告 → `pending_action` + `EX_DIVIDEND_AHEAD` 提醒** ⑤ **除權息參考價 → `peak_price` 調整** ⑥ **分割／減資偵測 → `pending_action`** ⑦ **成交量異常評估** ⑧ **產業類指數（`MI_INDEX`）每日快照** ⑨ 每日總結 Discord（14:00 前那則除外，見 [`alerts.md`](./alerts.md) §5） |
+| **盤後批次**（**單一任務，內含九個步驟**） | 每日 22:00 之後 | ① `daily_close` 回補 ② `benchmark_series` 回補 ③ `exchange_rate` 回補 ④ **除權息預告 → `pending_action` + `EX_DIVIDEND_AHEAD` 提醒** ⑤ **除權息參考價 → `peak_price` 調整** ⑥ **分割／減資偵測 → `pending_action`** ⑦ **成交量異常評估** ⑧ **產業類指數（`MI_INDEX`）每日快照** ⑨ **美股 `daily_close`（走 yfinance）** ⑩ 每日總結 Discord（14:00 前那則除外，見 [`alerts.md`](./alerts.md) §5） |
 | 備份 | 每日，盤後批次之後 | `pg_dump`（§3.3） |
 
-> **⑨ 個步驟為什麼是一個排程而不是九個**：它們共用同一個「回補到最新交易日」的游標，而**拆開之後每一個都要各自記住自己補到哪一天**——那是九份可以各自落後的狀態。合成一個之後，心跳只要看一個成功訊號（§5.2）。
+> **十個步驟為什麼是一個排程而不是十個**：它們共用同一個「回補到最新交易日」的游標，而**拆開之後每一個都要各自記住自己補到哪一天**——那是十份可以各自落後的狀態。合成一個之後，心跳只要看一個成功訊號（§5.2）。
+>
+> **⑨ 美股是 [#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 補的**：issue #1 早已定調「美股不需即時，改走 yfinance 盤後拉取」，但**沒有任何一份規格把它放進排程清單**——而 `market='US'` 與中性 CSV 都是開著的。使用者目前無美股持股，故它是一個**跑起來會是空集合的步驟**，這正是它容易被漏掉的原因。⚠️ **美股的交易日曆與台股不同**，回補游標必須各市場各一個（`performance.md` §2.2 的「聯集日曆」是曲線用的，不是回補用的）。
 >
 > ⚠️ **這張清單是 2026-08-09 由 [#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 的冷讀驗收補齊的**：④⑤⑦⑧ 四項分別由 [`alerts.md`](./alerts.md) §11 與 [`analysis-dimensions.md`](./analysis-dimensions.md) 明文交辦給 #17，⑥ 由 [`corporate-actions.md`](./corporate-actions.md) 交辦，而本文初版的清單**一項都沒有列**。交辦後沒人接的排程，就是一個永遠不會被實作的排程。
 >
