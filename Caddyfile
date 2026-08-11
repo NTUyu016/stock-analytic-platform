@@ -1,0 +1,23 @@
+# deployment.md §2.4：v1 不走標準 ACME（無對外 80/443）。
+# Caddy 2.5+ 看到 .ts.net 網域會自動向本機 tailscaled 取憑證，這裡不需要
+# 也不可以寫 tech-stack.md §8 那份「有網域就自動 HTTPS」的公開網域範例。
+#
+# {$TAILSCALE_HOSTNAME} 由 .env 提供，形如 <機器名>.<tailnet-name>.ts.net。
+# ⚠️ 機器名不得含可識別個人的字串（deployment.md §2.6，會進公開 CT log）。
+
+{$TAILSCALE_HOSTNAME} {
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv/frontend
+		try_files {path} /index.html
+		file_server
+		encode gzip
+	}
+
+	log {
+		output stdout
+	}
+}

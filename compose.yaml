@@ -1,0 +1,79 @@
+# deployment.md §1：prod 跑在 WSL2 內的 Docker Engine（不是 Docker Desktop）。
+# quote-worker 走獨立 profile，預設不啟動——tech-stack.md §4「可選元件」在這裡是預設行為。
+#
+# 本機開發：`docker compose up db api caddy`（或直接 `up`，quote-worker 不在
+# 預設 profile 內不會被啟動）。盤中要測即時報價才加 `--profile intraday`。
+
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stockapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stockapp}
+      POSTGRES_DB: ${POSTGRES_DB:-stockapp}
+    volumes:
+      # named volume，不是 bind mount：deployment.md §3 引用 Docker 官方
+      # "Volumes are the preferred mechanism"，且 WSL2 下 bind mount 到
+      # /mnt/c 效能差、沒有 inotify 事件。
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stockapp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-stockapp}:${POSTGRES_PASSWORD:-stockapp}@db:5432/${POSTGRES_DB:-stockapp}
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  quote-worker:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "quote_worker.main"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-stockapp}:${POSTGRES_PASSWORD:-stockapp}@db:5432/${POSTGRES_DB:-stockapp}
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - intraday
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./Caddyfile:/etc/caddyfile/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./frontend/dist:/srv/frontend:ro
+      # ⚠️ UNVERIFIED（deployment.md §2.4 / issue #22 0.3b）：Caddy 容器如何
+      # 取得 WSL2 主機上 tailscaled 的 socket，官方沒有直接記載這個組合。
+      # 這是目前的最佳猜測，實測前不要假設它能動：
+      - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
+    command: ["caddy", "run", "--config", "/etc/caddyfile/Caddyfile"]
+    depends_on:
+      - api
+    ports:
+      - "443:443"
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:
