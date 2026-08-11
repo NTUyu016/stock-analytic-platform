@@ -616,6 +616,7 @@ issue #17 body 原文自己就自問過「單人專案上 staging 可能是浪�
 | 13 | **Tailscale 金鑰 180 天後到期** | 半年後某天網站「連不上」，看起來像網站掛了 | §2.7 逐台關閉金鑰到期 |
 | 14 | **走 `tailscale cert` 手動寫憑證檔** | 官方明文「you are responsible for renewing」，90 天後靜默過期 | §2.4 規定走 Caddy 自動取用那條 |
 | 15 | **Tailscale 機器名取成「wife-laptop-securities」這類名字** | 它會原樣進入公開的 CT log，而且沒有任何提示 | §2.6 的硬性規則 |
+| 16 | **`market_index_daily` 漏跑一天** | `MI_INDEX` 官方只給最新一日，回補做不到——漏跑的表現是「產業比較不可用」，看起來像資料還在累積、不像漏跑（[#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 補） | 步驟 ⑧ 的斷點告警（比對 `market_index_daily` 與 `benchmark_series` 的最新交易日），見 [`data-model.md`](./data-model.md) `market_index_daily` 與 [`analysis-dimensions.md`](./analysis-dimensions.md) §15.3 |
 
 ---
 

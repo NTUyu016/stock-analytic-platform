@@ -784,7 +784,7 @@ TPEx OpenAPI **225 個 path 全數掃過**，指數類端點只有：櫃買指�
 
 ## 15. 對 `data-model.md` 的修訂
 
-> 本節是**建議稿**，不直接改 [`data-model.md`](./data-model.md)。格式比照該檔既有表格。
+> ✅ **已於 2026-08-09 合併進 [`data-model.md`](./data-model.md)**（`instrument.industry_code`、`industry_category`、`market_index_daily` 三處，逐字一致）。本節保留為「為什麼長這樣」的完整說明，**綱要本身以 `data-model.md` 為準**。
 > ⚠️ 前提：**不可把產業指數塞進 `daily_close` 或 `benchmark_series`**（理由見 §15.3），這是既有硬性規則的延伸。
 
 ### 15.1 `instrument` 新增一欄

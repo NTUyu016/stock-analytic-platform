@@ -90,6 +90,8 @@
 | 15 | **`SPLIT` 只存 `ratio`、不存股數增減量**；部位推導是**比率縮放的**不等式聚合 | `corporate-actions.md` §1.5 | 存 delta 等於把分割變成快照，補登舊交易時它永遠不會被修正 |
 | 16 | **容器一律 `TZ=UTC`，所有「哪一天」顯式換算到 `Asia/Taipei`** | `deployment.md` §4.2.1 | 依賴行程預設時區時，漏設的後果是台股 09:00 前的 8 小時全部算成前一天且不報錯 |
 | 17 | **額度判斷一律 slot 對 slot**，`src/core/` 不得自行把 slot 換算成檔數 | `realtime-quotes.md` §2 | Fugle 的 5 是「標的×頻道」配對，拿檔數比會算出「沒問題」然後被 provider 拒絕 |
+| 18 | **`instrument_type` 不得由反查自動決定**，只給建議值、需人工確認 | `transaction-input.md` §5 | 它決定證交稅是 0.3% 還是 0.1%，差三倍且猜錯不報錯 |
+| 19 | **未確認且會改股數的公司行動 → 該標的規則暫停評估**，寫 `alert_state.suspended_reason`，**不動 `is_enabled`** | `alerts.md` §1、`corporate-actions.md` §2.4 | 改 `is_enabled` 會覆寫使用者意圖；不暫停會用錯的股數給一個看起來正常的答案 |
 
 ---
 

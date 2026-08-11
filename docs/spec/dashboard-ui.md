@@ -230,6 +230,6 @@
 | 議題 | 票 |
 |---|---|
 | ~~推播節流頻率~~ → **已定為 800ms 全域節拍批次送**（見 [`realtime-quotes.md`](./realtime-quotes.md) §6）。§4 的 800ms 動畫直接成為節流節拍，整張持股表每 800ms 同步刷一次，對齊 §9 要求的單一 `requestAnimationFrame` 合併點 | [#13](https://github.com/NTUyu016/stock-analytic-platform/issues/13) |
-| 個股分析頁的呈現形式與五級建議 | [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) |
-| 警示卡片要顯示哪些規則類型 | [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) |
+| ~~個股分析頁的呈現形式與五級建議~~ → **已定為分數卡列表**（每維一列：名稱／數值／分數／貢獻），不用雷達圖，見 [`analysis-dimensions.md`](./analysis-dimensions.md) §5 | [#14](https://github.com/NTUyu016/stock-analytic-platform/issues/14) |
+| ~~警示卡片要顯示哪些規則類型~~ → **已定為規則面板**（六類九個列舉值全列、平鋪不摺疊），見 [`alerts.md`](./alerts.md) §9 | [#15](https://github.com/NTUyu016/stock-analytic-platform/issues/15) |
 | ~~每日總資產如何取得（快照 vs 重算）、報酬率演算法~~ → **已定為每次重算、不建快取**；報酬率分四個指標各有其位（見 [`performance.md`](./performance.md)）。連帶修訂本文 §5 與 §7 | [#16](https://github.com/NTUyu016/stock-analytic-platform/issues/16) |

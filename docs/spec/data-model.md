@@ -316,6 +316,22 @@
 - 另立表則讓 `transaction` 維持「**裡面每一列都是事實**」的不變量，**現有查詢一行都不用改**。
 - 決策來源：[#19](https://github.com/NTUyu016/stock-analytic-platform/issues/19)，詳見 [`transaction-input.md`](./transaction-input.md) §8。
 
+### `login_attempt`
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `id` | `bigserial` PK | |
+| `provider` | `text` NOT NULL | `google` / `github` |
+| `subject` | `text` NOT NULL | provider 給的穩定識別碼，語意同 `user_identity.subject` |
+| `email` | `text` NULL | 該次嘗試附帶的 email，僅供人工比對 |
+| `name` | `text` NULL | 該次嘗試附帶的顯示名稱，僅供人工比對 |
+| `attempted_at` | `timestamptz` NOT NULL | |
+| `outcome` | `text` NOT NULL | `REJECTED_NO_IDENTITY`（查無此人）/ `LINKED`（已被 `link-identity` 消耗）|
+
+- **[#18](https://github.com/NTUyu016/stock-analytic-platform/issues/18) 新增**，補上 [`auth.md`](./auth.md) §8.1 引用但本文件當時漏掉的表——bootstrap 流程「先被拒、再綁定」的落地處。
+- **不帶 `user_id`**：被拒絕時系統還不知道這個身分屬於哪個 `app_user`，這正是它存在的理由。
+- `outcome = 'LINKED'` 的列**不刪除**，`CLI` 的 `--from-attempt` 只能消耗一次 `REJECTED_NO_IDENTITY` 的列（已消耗的列不可重複綁定，否則同一次嘗試能綁到兩個帳號）。
+- 這張表**同時是唯一的入侵稽核**（`auth.md` §8.1）：上線後必有掃描器來敲，`REJECTED_NO_IDENTITY` 的列就是那個訊號。**不設保留期限**——比照 `notification` 的既有判斷，這個量級一年也就幾百列。
+
 ### `reconciliation`
 | 欄位 | 型別 | 說明 |
 |---|---|---|
